@@ -1,10 +1,14 @@
 package com.getfit.domain
 
+import kotlinx.serialization.Serializable
+
 /**
  * Pure work/rest session state machine, ported from the prototype (L836-893).
  * All transitions are pure functions on an immutable SessionState — no Android, fully unit-tested.
+ * Serializable so an in-progress session survives process death (persisted via DataStore).
  */
 
+@Serializable
 data class SessionItem(
     val id: String,
     val name: String,
@@ -15,11 +19,15 @@ data class SessionItem(
     val suggestW: Double,
 )
 
+@Serializable
 data class LoggedSetFull(val id: String, val name: String, val weight: Double, val reps: Int)
+
+@Serializable
 data class PrItem(val id: String, val name: String, val value: String)
 
 enum class Phase { WORK, REST, DONE }
 
+@Serializable
 data class SessionState(
     val items: List<SessionItem>,
     val idx: Int = 0,

@@ -52,7 +52,7 @@ fun GoalSheet(vm: AppViewModel) {
     val ex = data.exercise(nav.goalEx)
     val bw = ex?.let { isBW(it.equipment, it.reps) } ?: false
     val unit = if (bw) "reps" else settings.units
-    val cur = vm.goalCur(nav.goalEx)
+    val cur = vm.goalCurDisplay(nav.goalEx)
     val diff = nav.goalTarget - cur
     val per = if (diff > 0 && nav.goalWeeks > 0) diff / nav.goalWeeks else 0.0
     val canSave = nav.goalTarget > cur

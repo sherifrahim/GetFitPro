@@ -30,6 +30,7 @@ class AppContainer(private val appContext: Context) {
 
     val settingsStore = SettingsStore(appContext.dataStore)
     val planStore = PlanStore(appContext.dataStore)
+    val sessionStore = com.getfit.data.prefs.SessionStore(appContext.dataStore)
 
     val exerciseRepo = ExerciseRepo(db.exerciseDao(), db.logDao())
     val workoutRepo = WorkoutRepo(planStore, db.exerciseDao(), db.logDao(), db.sessionDao())

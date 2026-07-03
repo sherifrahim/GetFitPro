@@ -9,6 +9,7 @@ import com.getfit.data.prefs.Settings
 import com.getfit.di.AppContainer
 import com.getfit.domain.Best
 import com.getfit.domain.LoggedSet
+import com.getfit.domain.Units
 import com.getfit.domain.bestFor
 import com.getfit.domain.isBW
 import kotlinx.coroutines.Job
@@ -116,35 +117,47 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun obSetSlide(i: Int) = _nav.update { it.copy(obSlide = i) }
 
     // ---- goals ----
+    // Weights are stored in kg; targets are stored/compared in the exercise's natural unit
+    // (kg for weighted, reps for bodyweight). The goal sheet works in DISPLAY units and converts.
+    private fun isBwEx(id: String): Boolean =
+        data.value.exercise(id)?.let { isBW(it.equipment, it.reps) } ?: false
+
+    /** Current best in natural units (kg or reps). */
     fun goalCur(id: String): Double {
         val ex = data.value.exercise(id) ?: return Curated.DEFAULT_WEIGHT[id] ?: 20.0
         val b = data.value.bestMap[id]
-        val bw = isBW(ex.equipment, ex.reps)
-        return b?.let { if (bw) it.reps.toDouble() else it.weight } ?: (Curated.DEFAULT_WEIGHT[id] ?: 20.0)
+        return b?.let { if (isBW(ex.equipment, ex.reps)) it.reps.toDouble() else it.weight }
+            ?: (Curated.DEFAULT_WEIGHT[id] ?: 20.0)
     }
+
+    /** Current best in the display unit shown in the sheet. */
+    fun goalCurDisplay(id: String): Double =
+        if (isBwEx(id)) goalCur(id) else Units.toDisplay(goalCur(id), settings.value.units)
+
     fun openGoal(id: String) {
-        val bw = data.value.exercise(id)?.let { isBW(it.equipment, it.reps) } ?: false
-        val cur = goalCur(id)
-        _nav.update { it.copy(detailId = null, goalOpen = true, goalEx = id, goalWeeks = 8, goalTarget = cur + if (bw) 3.0 else 10.0) }
+        val bw = isBwEx(id)
+        _nav.update { it.copy(detailId = null, goalOpen = true, goalEx = id, goalWeeks = 8, goalTarget = goalCurDisplay(id) + if (bw) 3.0 else 10.0) }
     }
     fun openNewGoal() = openGoal(Curated.GOAL_EX.first())
     fun selectGoalEx(id: String) {
-        val bw = data.value.exercise(id)?.let { isBW(it.equipment, it.reps) } ?: false
-        _nav.update { it.copy(goalEx = id, goalTarget = goalCur(id) + if (bw) 3.0 else 10.0) }
+        val bw = isBwEx(id)
+        _nav.update { it.copy(goalEx = id, goalTarget = goalCurDisplay(id) + if (bw) 3.0 else 10.0) }
     }
     fun adjustGoal(dir: Int) {
-        val bw = data.value.exercise(_nav.value.goalEx)?.let { isBW(it.equipment, it.reps) } ?: false
-        val step = if (bw) 1.0 else if (settings.value.units == "lb") 5.0 else 2.5
+        val bw = isBwEx(_nav.value.goalEx)
+        val step = if (bw) 1.0 else Units.step(settings.value.units)
         _nav.update { it.copy(goalTarget = (it.goalTarget + dir * step).coerceAtLeast(1.0).let { v -> Math.round(v * 100) / 100.0 }) }
     }
     fun setGoalWeeks(w: Int) = _nav.update { it.copy(goalWeeks = w) }
     fun closeGoal() = _nav.update { it.copy(goalOpen = false) }
     fun saveGoal() = viewModelScope.launch {
         val s = _nav.value
-        val cur = goalCur(s.goalEx)
-        if (s.goalTarget <= cur) return@launch
+        val bw = isBwEx(s.goalEx)
+        val curNatural = goalCur(s.goalEx)
+        val targetNatural = if (bw) s.goalTarget else Units.fromDisplay(s.goalTarget, settings.value.units)
+        if (targetNatural <= curNatural) return@launch
         val now = System.currentTimeMillis()
-        progressRepo.addTarget(TargetEntity("t$now", s.goalEx, s.goalTarget, cur, now, s.goalWeeks))
+        progressRepo.addTarget(TargetEntity("t$now", s.goalEx, targetNatural, curNatural, now, s.goalWeeks))
         _nav.update { it.copy(goalOpen = false) }
         toast("Target set", "flag")
     }

@@ -41,6 +41,8 @@ import com.getfit.core.ui.msIcon
 import com.getfit.core.ui.pressScale
 import com.getfit.data.db.Curated
 import com.getfit.domain.SessionRecord
+import com.getfit.domain.Units
+import com.getfit.domain.floorDayLocal
 import com.getfit.domain.fmtDur
 import com.getfit.domain.fmtVol
 import com.getfit.domain.streakCount
@@ -67,7 +69,7 @@ fun HomeScreen(vm: AppViewModel) {
         data.sessions.map { SessionRecord(it.id, it.dateMs, it.name, it.durationSec, it.totalSets, it.volume, it.prs) },
         weekStartLocal(now),
     )
-    val streak = streakCount(data.sessions.map { it.dateMs }, now)
+    val streak = streakCount(data.sessions.map { it.dateMs }, now, ::floorDayLocal)
 
     val exCount = data.plan.size
     val setsTotal = data.plan.sumOf { it.sets }
@@ -116,7 +118,7 @@ fun HomeScreen(vm: AppViewModel) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatCard(msIcon("exercise"), week.workouts.toString(), "Workouts", Modifier.weight(1f))
             StatCard(msIcon("timer"), fmtDur(week.durationSec), "Time", Modifier.weight(1f))
-            StatCard(msIcon("trending_up"), fmtVol(week.totalVolume), "Volume ${settings.units}", Modifier.weight(1f))
+            StatCard(msIcon("trending_up"), fmtVol(Units.volDisplay(week.totalVolume, settings.units)), "Volume ${settings.units}", Modifier.weight(1f))
         }
 
         // categories

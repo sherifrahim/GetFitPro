@@ -61,7 +61,7 @@ import com.getfit.core.ui.ShimmerBox
 import com.getfit.core.ui.msIcon
 import com.getfit.core.ui.pressScale
 import com.getfit.domain.DAY_MS
-import com.getfit.domain.fmtW
+import com.getfit.domain.Units
 import com.getfit.domain.isBW
 import com.getfit.domain.targetDaysLeft
 import com.getfit.domain.targetPct
@@ -97,12 +97,20 @@ fun DetailScreen(vm: AppViewModel, id: String) {
                     }
                 }
 
+                if (ex.secondaryMuscles.isNotBlank()) {
+                    Text(
+                        "Also works ${ex.secondaryMuscles.lowercase()}",
+                        color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+
                 // PR + last
                 Row(Modifier.padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StatBox(
                         "Personal best",
-                        if (best != null) (if (bw) "${best.reps} reps" else "${fmtW(best.weight)} $units × ${best.reps}") else "Not yet set",
-                        if (best != null) (if (bw) "Best set logged" else "Est. 1RM ${best.e1rm} $units") else "Log a set to start tracking",
+                        if (best != null) (if (bw) "${best.reps} reps" else "${Units.fmtDisplay(best.weight, units)} $units × ${best.reps}") else "Not yet set",
+                        if (best != null) (if (bw) "Best set logged" else "Est. 1RM ${Units.toDisplay(best.e1rm.toDouble(), units).roundToInt()} $units") else "Log a set to start tracking",
                         Modifier.weight(1.35f),
                     )
                     StatBox(
@@ -122,13 +130,13 @@ fun DetailScreen(vm: AppViewModel, id: String) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                                 Icon(msIcon("flag"), null, tint = GfColor.Lime, modifier = Modifier.size(18.dp))
-                                Text("Target ${if (bw) "${target.target.roundToInt()} reps" else "${fmtW(target.target)} $units"}", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.5.sp)
+                                Text("Target ${if (bw) "${target.target.roundToInt()} reps" else "${Units.fmtDisplay(target.target, units)} $units"}", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.5.sp)
                             }
                             Text("${(pct * 100).roundToInt()}%", color = GfColor.Lime, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 13.sp)
                         }
                         ProgressBar(pct.toFloat(), Modifier.padding(top = 10.dp))
                         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(if (remain <= 0) "Target reached" else "+${if (bw) remain.roundToInt() else fmtW(remain)} ${if (bw) "reps" else units} to go", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 11.5.sp)
+                            Text(if (remain <= 0) "Target reached" else "+${if (bw) remain.roundToInt().toString() else Units.fmtDisplay(remain, units)} ${if (bw) "reps" else units} to go", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 11.5.sp)
                             Text("$days days left", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 11.5.sp)
                         }
                     }

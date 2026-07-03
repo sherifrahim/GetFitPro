@@ -7,6 +7,7 @@ import com.getfit.domain.LoggedSet
 import com.getfit.domain.Phase
 import com.getfit.domain.SessionItem
 import com.getfit.domain.SessionState
+import com.getfit.domain.Units
 import com.getfit.domain.addRest
 import com.getfit.domain.adjustR
 import com.getfit.domain.adjustW
@@ -42,33 +43,51 @@ class SessionController(
 
     private var ticker: Job? = null
     @Volatile private var units: String = "kg"
+    @Volatile private var autorest: Boolean = true
 
     init {
-        scope.launch { container.settingsStore.flow.collect { units = it.units } }
+        scope.launch { container.settingsStore.flow.collect { units = it.units; autorest = it.autorest } }
+        // Restore an in-progress session after process death.
+        scope.launch {
+            val saved = container.sessionStore.load()
+            if (saved != null) {
+                _state.value = saved
+                if (saved.phase != Phase.DONE) startTicker()
+            }
+        }
+    }
+
+    /** Persist current session state (or clear it when the session ends). */
+    private fun persist() = scope.launch {
+        val s = _state.value
+        if (s == null) container.sessionStore.clear() else container.sessionStore.save(s)
     }
 
     fun start(items: List<PlanItemData>) {
         scope.launch {
             val settings = container.settingsStore.flow.first()
+            val u = settings.units
             val exs = container.exerciseRepo.byIds(items.map { it.id }).associateBy { it.id }
             val logsByEx = container.exerciseRepo.logs.first().groupBy { it.exerciseId }
 
+            // Session operates in the user's DISPLAY unit; kg is converted in/out at the boundary.
             val sessItems = items.mapNotNull { pi ->
                 val e = exs[pi.id] ?: return@mapNotNull null
                 val bw = isBW(e.equipment, e.reps)
-                val last = logsByEx[pi.id]?.maxByOrNull { it.dateMs }?.weight
-                val suggest = last ?: Curated.DEFAULT_WEIGHT[pi.id] ?: 20.0
-                SessionItem(pi.id, e.name, e.muscle, pi.sets, pi.reps, bw, suggest)
+                val lastKg = logsByEx[pi.id]?.maxByOrNull { it.dateMs }?.weight
+                val suggestKg = lastKg ?: Curated.DEFAULT_WEIGHT[pi.id] ?: 20.0
+                SessionItem(pi.id, e.name, e.muscle, pi.sets, pi.reps, bw, Units.roundDisplay(Units.toDisplay(suggestKg, u)))
             }
             if (sessItems.isEmpty()) return@launch
 
             val preBest = sessItems.associate { si ->
                 val ls = logsByEx[si.id].orEmpty().map { LoggedSet(it.exerciseId, it.weight, it.reps, it.dateMs) }
                 val b = bestFor(ls, si.bw)
-                si.id to ((b?.weight ?: 0.0) to (b?.reps ?: 0))
+                si.id to ((b?.let { Units.toDisplay(it.weight, u) } ?: 0.0) to (b?.reps ?: 0))
             }
             _state.value = startSession(sessItems, settings.restDefault, preBest)
             startTicker()
+            persist()
         }
     }
 
@@ -84,36 +103,46 @@ class SessionController(
         }
     }
 
-    fun doneSet() = _state.update { s ->
-        s ?: return@update null
-        val r = doneSet(s, units)
-        if (r.pr) toast("New personal record!", "local_fire_department")
-        r.state
+    fun doneSet() {
+        _state.update { s ->
+            s ?: return@update null
+            val r = doneSet(s, units)
+            if (r.pr) toast("New personal record!", "local_fire_department")
+            // If auto-start-rest is off, hold the rest timer paused until the user starts/skips it.
+            if (r.state.phase == Phase.REST && !autorest) r.state.copy(paused = true) else r.state
+        }
+        persist()
     }
 
-    fun skip() = _state.update { s -> if (s?.phase == Phase.REST) advanceFromRest(s, false) else s }
-    fun addRest(delta: Int) = _state.update { it?.let { s -> addRest(s, delta) } }
-    fun togglePause() = _state.update { it?.copy(paused = !it.paused) }
-    fun incW() = _state.update { it?.let { s -> adjustW(s, 1, units) } }
-    fun decW() = _state.update { it?.let { s -> adjustW(s, -1, units) } }
-    fun incR() = _state.update { it?.let { s -> adjustR(s, 1) } }
-    fun decR() = _state.update { it?.let { s -> adjustR(s, -1) } }
+    fun skip() { _state.update { s -> if (s?.phase == Phase.REST) advanceFromRest(s, false) else s }; persist() }
+    fun addRest(delta: Int) { _state.update { it?.let { s -> addRest(s, delta) } }; persist() }
+    fun togglePause() { _state.update { it?.copy(paused = !it.paused) }; persist() }
+    fun incW() { _state.update { it?.let { s -> adjustW(s, 1, units) } }; persist() }
+    fun decW() { _state.update { it?.let { s -> adjustW(s, -1, units) } }; persist() }
+    fun incR() { _state.update { it?.let { s -> adjustR(s, 1) } }; persist() }
+    fun decR() { _state.update { it?.let { s -> adjustR(s, -1) } }; persist() }
 
     /** Persist the session (if anything logged) and clear. */
     suspend fun endAndSave() {
         ticker?.cancel()
         val s = _state.value
         if (s != null && s.log.isNotEmpty()) {
+            val u = units
+            val bwById = s.items.associate { it.id to it.bw }
+            // Convert logged display-unit weights back to canonical kg for storage.
+            val setsKg = s.log.map { SessionSaveSet(it.id, it.name, Units.fromDisplay(it.weight, u), it.reps) }
+            val volumeKg = setsKg.sumOf { if (bwById[it.exerciseId] == true) 0.0 else it.weight * it.reps }
             container.workoutRepo.saveSession(
                 now = System.currentTimeMillis(),
                 name = "Push Day",
                 durationSec = s.elapsed,
-                sets = s.log.map { SessionSaveSet(it.id, it.name, it.weight, it.reps) },
-                volume = Math.round(s.volume).toInt(),
+                sets = setsKg,
+                volume = Math.round(volumeKg).toInt(),
                 prs = s.newPRs.size,
             )
             toast("Workout saved", "check_circle")
         }
         _state.value = null
+        container.sessionStore.clear()
     }
 }

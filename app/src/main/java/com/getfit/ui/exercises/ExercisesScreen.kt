@@ -46,7 +46,7 @@ import com.getfit.core.ui.pressScale
 import com.getfit.data.db.Curated
 import com.getfit.data.db.ExerciseEntity
 import com.getfit.domain.Best
-import com.getfit.domain.fmtW
+import com.getfit.domain.Units
 import com.getfit.domain.isBW
 import com.getfit.ui.AppViewModel
 
@@ -60,7 +60,8 @@ fun ExercisesScreen(vm: AppViewModel) {
         data.exercises.filter { e ->
             (nav.filter == "All" || e.muscle == nav.filter) &&
                 (q.isBlank() || e.name.lowercase().contains(q) ||
-                    e.muscle.lowercase().contains(q) || e.equipment.lowercase().contains(q))
+                    e.muscle.lowercase().contains(q) || e.equipment.lowercase().contains(q) ||
+                    e.target.lowercase().contains(q) || e.secondaryMuscles.lowercase().contains(q))
         }
     }
     val libLine = if (q.isNotBlank() || nav.filter != "All") "${filtered.size} results"
@@ -144,7 +145,7 @@ private fun ExerciseRow(ex: ExerciseEntity, best: Best?, units: String, onOpen: 
         }
         if (best != null) {
             Column(horizontalAlignment = Alignment.End) {
-                Text(if (bw) "${best.reps} reps" else "${fmtW(best.weight)} $units", color = GfColor.Lime, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
+                Text(if (bw) "${best.reps} reps" else "${Units.fmtDisplay(best.weight, units)} $units", color = GfColor.Lime, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
                 Text("BEST", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 9.5.sp)
             }
         }

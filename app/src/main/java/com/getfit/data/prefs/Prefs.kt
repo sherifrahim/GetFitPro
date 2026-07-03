@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.getfit.data.db.Curated
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -36,6 +37,7 @@ private object Keys {
     val ONBOARDED = booleanPreferencesKey("onboarded")
     val SEEDED = booleanPreferencesKey("seeded")
     val PLAN = stringPreferencesKey("plan")
+    val SESSION = stringPreferencesKey("session")
 }
 
 class SettingsStore(private val ds: DataStore<Preferences>) {
@@ -84,4 +86,19 @@ class PlanStore(private val ds: DataStore<Preferences>) {
         ds.edit { it[Keys.PLAN] = json.encodeToString(list) }
 
     suspend fun resetToDefault() = set(default)
+}
+
+/** Persists the in-progress guided session so it survives process death. */
+class SessionStore(private val ds: DataStore<Preferences>) {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    suspend fun save(state: com.getfit.domain.SessionState) =
+        ds.edit { it[Keys.SESSION] = json.encodeToString(state) }
+
+    suspend fun clear() = ds.edit { it.remove(Keys.SESSION) }
+
+    suspend fun load(): com.getfit.domain.SessionState? =
+        ds.data.first()[Keys.SESSION]?.let {
+            runCatching { json.decodeFromString<com.getfit.domain.SessionState>(it) }.getOrNull()
+        }
 }

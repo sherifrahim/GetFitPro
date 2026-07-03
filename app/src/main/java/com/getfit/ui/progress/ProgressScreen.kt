@@ -43,8 +43,9 @@ import com.getfit.core.ui.ProgressRing
 import com.getfit.core.ui.msIcon
 import com.getfit.domain.DAY_MS
 import com.getfit.domain.SessionRecord
+import com.getfit.domain.Units
+import com.getfit.domain.floorDayLocal
 import com.getfit.domain.fmtVol
-import com.getfit.domain.fmtW
 import com.getfit.domain.isBW
 import com.getfit.domain.streakCount
 import com.getfit.domain.targetDaysLeft
@@ -72,7 +73,7 @@ fun ProgressScreen(vm: AppViewModel) {
     val goalMsg = if (weekDone >= weekGoal) "You hit your weekly target — great work."
     else "${weekGoal - weekDone} more ${if (weekGoal - weekDone == 1) "session" else "sessions"} to hit your goal."
 
-    val streak = streakCount(data.sessions.map { it.dateMs }, now)
+    val streak = streakCount(data.sessions.map { it.dateMs }, now, ::floorDayLocal)
     val totalVol = data.sessions.sumOf { it.volume }
     val monthStart = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
     val prMonth = data.sessions.filter { it.dateMs >= monthStart }.sumOf { it.prs }
@@ -112,7 +113,7 @@ fun ProgressScreen(vm: AppViewModel) {
         ) {
             Row(Modifier.fillMaxWidth().padding(bottom = 18.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Volume this week", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
-                Text("${week.totalVolume} $units", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
+                Text("${Units.volDisplay(week.totalVolume, units)} $units", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
             }
             val todayIdx = (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) + 5) % 7
             val maxV = (week.dayVolume.maxOrNull() ?: 0).coerceAtLeast(1)
@@ -143,7 +144,7 @@ fun ProgressScreen(vm: AppViewModel) {
             }
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ProgStat("monitoring", GfColor.Lime, "Total volume", "${fmtVol(totalVol)} $units", Modifier.weight(1f))
+                ProgStat("monitoring", GfColor.Lime, "Total volume", "${fmtVol(Units.volDisplay(totalVol, units))} $units", Modifier.weight(1f))
                 ProgStat("emoji_events", GfColor.Amber, "PRs this month", prMonth.toString(), Modifier.weight(1f))
             }
         }
@@ -165,10 +166,10 @@ fun ProgressScreen(vm: AppViewModel) {
                 }
                 Column(Modifier.weight(1f)) {
                     Text(ex.name, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W600, fontSize = 14.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(if (b.bodyweight) "${ex.muscle} · best set" else "Est. 1RM ${b.e1rm} $units", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                    Text(if (b.bodyweight) "${ex.muscle} · best set" else "Est. 1RM ${Units.toDisplay(b.e1rm.toDouble(), units).roundToInt()} $units", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(if (b.bodyweight) "${b.reps} reps" else "${fmtW(b.weight)} $units × ${b.reps}", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 14.sp)
+                    Text(if (b.bodyweight) "${b.reps} reps" else "${Units.fmtDisplay(b.weight, units)} $units × ${b.reps}", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 14.sp)
                     if (recent) Text("NEW PR", color = GfColor.Amber, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 9.5.sp, modifier = Modifier.padding(top = 2.dp))
                 }
             }
@@ -208,16 +209,16 @@ fun ProgressScreen(vm: AppViewModel) {
                         Icon(msIcon("close"), null, tint = GfColor.TextFaint, modifier = Modifier.size(18.dp).clickable(remember { MutableInteractionSource() }, indication = null) { vm.deleteTarget(t.id) })
                     }
                     Row(Modifier.padding(top = 9.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                        Text(if (bw) "${cur.roundToInt()} reps" else "${fmtW(cur)} $units", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 21.sp)
+                        Text(if (bw) "${cur.roundToInt()} reps" else "${Units.fmtDisplay(cur, units)} $units", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 21.sp)
                         Icon(msIcon("arrow_forward"), null, tint = GfColor.TextFaint, modifier = Modifier.size(16.dp).padding(bottom = 3.dp))
-                        Text(if (bw) "${t.target.roundToInt()} reps" else "${fmtW(t.target)} $units", color = GfColor.Lime, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
+                        Text(if (bw) "${t.target.roundToInt()} reps" else "${Units.fmtDisplay(t.target, units)} $units", color = GfColor.Lime, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
                     }
                     Box(Modifier.padding(top = 11.dp).fillMaxWidth().height(7.dp).clip(RoundedCornerShape(999.dp)).background(GfColor.Hairline10)) {
                         val w by animateFloatAsState(if (nav.charted) pct.toFloat() else 0f, tween(1000), label = "tgt")
                         Box(Modifier.fillMaxWidth(w).height(7.dp).clip(RoundedCornerShape(999.dp)).background(GfColor.Lime))
                     }
                     Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(if (done) "Reached — nice!" else "+${if (bw) remain.roundToInt() else fmtW(remain)} ${if (bw) "reps" else units} to go", color = if (done) GfColor.Lime else GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 11.5.sp)
+                        Text(if (done) "Reached — nice!" else "+${if (bw) remain.roundToInt().toString() else Units.fmtDisplay(remain, units)} ${if (bw) "reps" else units} to go", color = if (done) GfColor.Lime else GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 11.5.sp)
                         Text(if (days <= 0) "Due now" else "${days}d left", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 11.5.sp)
                     }
                 }
@@ -246,7 +247,7 @@ fun ProgressScreen(vm: AppViewModel) {
                     }
                     Column(Modifier.weight(1f)) {
                         Text(h.name, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W600, fontSize = 14.5.sp)
-                        Text("${(h.durationSec / 60).coerceAtLeast(1)} min · ${h.totalSets} sets · ${if (h.volume > 0) "${h.volume} $units" else "bodyweight"}", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                        Text("${(h.durationSec / 60).coerceAtLeast(1)} min · ${h.totalSets} sets · ${if (h.volume > 0) "${Units.volDisplay(h.volume, units)} $units" else "bodyweight"}", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                     }
                     Text(relDay(h.dateMs, now), color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.sp)
                 }

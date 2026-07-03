@@ -40,7 +40,7 @@ import com.getfit.core.ui.msIcon
 import com.getfit.core.ui.pressScale
 import com.getfit.data.db.Curated
 import com.getfit.data.prefs.PlanItemData
-import com.getfit.domain.fmtW
+import com.getfit.domain.Units
 import com.getfit.domain.isBW
 import com.getfit.ui.AppViewModel
 
@@ -134,7 +134,7 @@ private fun subFor(vm: AppViewModel, id: String, units: String): String {
     val data = vm.data.value
     val ex = data.exercise(id) ?: return ""
     val best = data.bestMap[id] ?: return ex.muscle
-    return if (isBW(ex.equipment, ex.reps)) "Best ${best.reps} reps" else "Best ${fmtW(best.weight)} $units"
+    return if (isBW(ex.equipment, ex.reps)) "Best ${best.reps} reps" else "Best ${Units.fmtDisplay(best.weight, units)} $units"
 }
 
 @Composable

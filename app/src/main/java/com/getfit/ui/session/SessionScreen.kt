@@ -1,5 +1,6 @@
 package com.getfit.ui.session
 
+import android.view.SoundEffectConstants
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -29,6 +30,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -67,6 +71,11 @@ private fun ActiveView(s: SessionState, units: String, vm: AppViewModel) {
     val it = s.current
     val isRest = s.phase == Phase.REST
     val ctrl = vm.sessionController
+    val settings by vm.settings.collectAsState()
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    val tick = { if (settings.haptics) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+    val click = { if (settings.sound) view.playSoundEffect(SoundEffectConstants.CLICK) }
     val ringProgress = if (isRest) s.restLeft / s.restTotal.coerceAtLeast(1).toFloat()
     else s.completedSets / s.totalSets.coerceAtLeast(1).toFloat()
 
@@ -117,30 +126,30 @@ private fun ActiveView(s: SessionState, units: String, vm: AppViewModel) {
         if (isRest) {
             val nextName = if (s.setNum < it.sets) it.name else s.items.getOrNull(s.idx + 1)?.name ?: "Finish"
             Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                RestSideButton("−15") { ctrl.addRest(-15) }
+                RestSideButton("−15") { tick(); ctrl.addRest(-15) }
                 Row(
                     Modifier.weight(1f).height(56.dp).clip(RoundedCornerShape(16.dp)).background(GfColor.Lime)
-                        .clickable(remember { MutableInteractionSource() }, indication = null) { ctrl.skip() },
+                        .clickable(remember { MutableInteractionSource() }, indication = null) { tick(); click(); ctrl.skip() },
                     horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text("Skip rest", color = GfColor.OnAccent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
                     Spacer(Modifier.width(8.dp))
                     Icon(msIcon("skip_next"), null, tint = GfColor.OnAccent, modifier = Modifier.size(22.dp))
                 }
-                RestSideButton("+15") { ctrl.addRest(15) }
+                RestSideButton("+15") { tick(); ctrl.addRest(15) }
             }
             Text("Up next · $nextName", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp))
         } else {
             Row(Modifier.fillMaxWidth().padding(bottom = 11.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (!it.bw) {
-                    StepperCard(label = "Weight", value = fmtW(s.curW), unit = units, prBadge = prPace(s), modifier = Modifier.weight(1f), onDec = ctrl::decW, onInc = ctrl::incW)
+                    StepperCard(label = "Weight", value = fmtW(s.curW), unit = units, prBadge = prPace(s), modifier = Modifier.weight(1f), onDec = { tick(); ctrl.decW() }, onInc = { tick(); ctrl.incW() })
                 }
-                StepperCard(label = if (isTimeBased(it.reps)) "Seconds" else "Reps", value = s.curR.toString(), unit = null, prBadge = false, modifier = Modifier.weight(1f), onDec = ctrl::decR, onInc = ctrl::incR)
+                StepperCard(label = if (isTimeBased(it.reps)) "Seconds" else "Reps", value = s.curR.toString(), unit = null, prBadge = false, modifier = Modifier.weight(1f), onDec = { tick(); ctrl.decR() }, onInc = { tick(); ctrl.incR() })
             }
             Row(
                 Modifier.fillMaxWidth().height(58.dp).pressScale(remember { MutableInteractionSource() }, 0.98f)
                     .clip(RoundedCornerShape(18.dp)).background(GfColor.Lime)
-                    .clickable(remember { MutableInteractionSource() }, indication = null) { ctrl.doneSet() },
+                    .clickable(remember { MutableInteractionSource() }, indication = null) { tick(); click(); ctrl.doneSet() },
                 horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(msIcon("check"), null, tint = GfColor.OnAccent, modifier = Modifier.size(24.dp))
