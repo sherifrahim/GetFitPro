@@ -33,6 +33,7 @@ import com.getfit.ui.builder.BuilderScreen
 import com.getfit.ui.detail.DetailScreen
 import com.getfit.ui.exercises.ExercisesScreen
 import com.getfit.ui.home.HomeScreen
+import com.getfit.ui.progress.GoalSheet
 import com.getfit.ui.progress.ProgressScreen
 import com.getfit.ui.session.SessionScreen
 import com.getfit.ui.splash.SplashScreen
@@ -72,6 +73,11 @@ fun RootScaffold(vm: AppViewModel) {
             exit = slideOutVertically(tween(300)) { it },
         ) {
             nav.detailId?.let { DetailScreen(vm, it) }
+        }
+
+        // Goal bottom sheet
+        AnimatedVisibility(visible = nav.goalOpen, enter = fadeIn(tween(250)), exit = fadeOut(tween(200))) {
+            GoalSheet(vm)
         }
 
         // Guided session (top-most)
