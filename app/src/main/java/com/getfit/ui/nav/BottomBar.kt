@@ -59,21 +59,24 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, modifier: Modifier =
             .fillMaxWidth()
             .background(GfColor.Background.copy(alpha = 0.92f)),
     ) {
-        BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 10.dp)) {
             val cell = maxWidth / TABS.size
+            val pillW = 64.dp
+            val pillH = 34.dp
             val indicatorX by animateDpAsState(
-                targetValue = cell * activeIndex + (cell - 60.dp) / 2,
+                targetValue = cell * activeIndex + (cell - pillW) / 2,
                 animationSpec = GfSpring.overshoot(),
                 label = "tabIndicator",
             )
+            // Sliding pill — sits exactly over the icon box (both top-aligned, same height).
             Box(
                 Modifier
                     .offset(x = indicatorX)
-                    .size(width = 60.dp, height = 34.dp)
+                    .size(width = pillW, height = pillH)
                     .clip(RoundedCornerShape(999.dp))
                     .background(GfColor.LimeFill15),
             )
-            Row(Modifier.fillMaxWidth().height(48.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 TABS.forEach { tab ->
                     val active = tab.key == selected
                     val interaction = remember { MutableInteractionSource() }
@@ -82,22 +85,25 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, modifier: Modifier =
                             .width(cell)
                             .clickable(interaction, indication = null) { onSelect(tab.key) },
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
                     ) {
-                        Icon(
-                            tab.icon, contentDescription = tab.label,
-                            tint = if (active) GfColor.Lime else GfColor.TextFaint,
-                            modifier = Modifier.size(24.dp),
-                        )
+                        // Icon centered inside a box the exact size of the pill -> perfect fit.
+                        Box(Modifier.height(pillH), contentAlignment = Alignment.Center) {
+                            Icon(
+                                tab.icon, contentDescription = tab.label,
+                                tint = if (active) GfColor.Lime else GfColor.TextFaint,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
                         Text(
                             tab.label,
                             color = if (active) GfColor.Lime else GfColor.TextFaint,
                             fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 10.5.sp,
+                            modifier = Modifier.padding(top = 3.dp),
                         )
                     }
                 }
             }
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
     }
 }
