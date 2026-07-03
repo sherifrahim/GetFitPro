@@ -177,13 +177,25 @@ private fun StepperCard(label: String, value: String, unit: String?, prBadge: Bo
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = 7.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Icon(msIcon("remove_circle"), null, tint = GfColor.Lime, modifier = Modifier.size(30.dp).clickable(remember { MutableInteractionSource() }, indication = null, onClick = onDec))
+            StepHit("remove_circle", onDec)
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(value, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 24.sp)
                 if (unit != null) Text(unit, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 10.sp)
             }
-            Icon(msIcon("add_circle"), null, tint = GfColor.Lime, modifier = Modifier.size(30.dp).clickable(remember { MutableInteractionSource() }, indication = null, onClick = onInc))
+            StepHit("add_circle", onInc)
         }
+    }
+}
+
+/** 30dp circular stepper icon with a 44dp touch target. */
+@Composable
+private fun StepHit(icon: String, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        Modifier.size(44.dp).pressScale(interaction, 0.86f).clickable(interaction, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(msIcon(icon), null, tint = GfColor.Lime, modifier = Modifier.size(30.dp))
     }
 }
 

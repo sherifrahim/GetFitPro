@@ -23,7 +23,10 @@ object GfColor {
     // Text
     val Text = Color(0xFFF6F0E6)
     val TextDim = Color(0xFFA99C8A)
-    val TextFaint = Color(0xFF6E6353)
+
+    // Prototype used #6E6353 for micro-labels, but that's ~3.2:1 on the dark bg (fails WCAG AA).
+    // Lifted to #8F8371 (~5:1) so small labels (tab labels, "BEST", day letters, units) are legible.
+    val TextFaint = Color(0xFF8F8371)
     val TextCue = Color(0xFFC9BDAB)
 
     // Accent lime + gradient

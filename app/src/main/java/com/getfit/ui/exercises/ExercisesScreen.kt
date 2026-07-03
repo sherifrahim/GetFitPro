@@ -150,11 +150,15 @@ private fun ExerciseRow(ex: ExerciseEntity, best: Best?, units: String, onOpen: 
         }
         val add = remember { MutableInteractionSource() }
         Box(
-            Modifier.size(34.dp).pressScale(add, 0.88f).clip(RoundedCornerShape(11.dp)).background(GfColor.SurfaceElevated)
-                .clickable(add, indication = null, onClick = onAdd),
+            Modifier.size(44.dp).clickable(add, indication = null, onClick = onAdd),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(msIcon("add"), null, tint = GfColor.Lime, modifier = Modifier.size(20.dp))
+            Box(
+                Modifier.size(34.dp).pressScale(add, 0.88f).clip(RoundedCornerShape(11.dp)).background(GfColor.SurfaceElevated),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(msIcon("add"), null, tint = GfColor.Lime, modifier = Modifier.size(20.dp))
+            }
         }
     }
 }

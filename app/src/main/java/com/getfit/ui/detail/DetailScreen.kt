@@ -158,9 +158,10 @@ fun DetailScreen(vm: AppViewModel, id: String) {
             }
         }
 
-        // bottom actions
+        // bottom actions (top hairline only)
+        Box(Modifier.fillMaxWidth().height(1.dp).background(GfColor.Hairline06))
         Row(
-            Modifier.fillMaxWidth().background(GfColor.Background).border(1.dp, GfColor.Hairline06).padding(horizontal = 20.dp, vertical = 14.dp).navigationBarsPadding(),
+            Modifier.fillMaxWidth().background(GfColor.Background).padding(horizontal = 20.dp, vertical = 14.dp).navigationBarsPadding(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             val addI = remember { MutableInteractionSource() }
