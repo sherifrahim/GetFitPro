@@ -49,7 +49,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
 import com.getfit.core.Constants
 import com.getfit.core.theme.GfColor
 import com.getfit.core.theme.GfDifficulty
@@ -211,17 +213,25 @@ private fun DemoStage(mediaId: String?, gifUrl: String, muscle: String, onClose:
         }
         Box(Modifier.size(150.dp).background(Brush.radialGradient(listOf(GfColor.Lime.copy(alpha = glow), Color.Transparent)), RoundedCornerShape(999.dp)))
 
-        if (gifUrl.isNotBlank()) {
-            Box(Modifier.size(width = 248.dp, height = 232.dp).clip(RoundedCornerShape(22.dp))) {
-                ShimmerBox(Modifier.fillMaxSize())
-                AsyncImage(model = gifUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            }
-        } else {
-            Box(
-                Modifier.size(width = 248.dp, height = 232.dp).clip(RoundedCornerShape(22.dp)).background(GfColor.Surface).border(1.dp, GfColor.Hairline08, RoundedCornerShape(22.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(MuscleIcon.of(muscle), null, tint = GfColor.Lime, modifier = Modifier.offset(y = bob.dp).size(72.dp))
+        // Demo slot: loads {MEDIA_BASE}{media_id}.gif — shimmer while loading, animated-icon
+        // fallback on empty/failed load (e.g. the CDN being down), the GIF once it succeeds.
+        SubcomposeAsyncImage(
+            model = gifUrl.ifBlank { null },
+            contentDescription = "$muscle exercise demo",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(width = 248.dp, height = 232.dp).clip(RoundedCornerShape(22.dp)),
+        ) {
+            when (painter.state) {
+                is AsyncImagePainter.State.Loading ->
+                    ShimmerBox(Modifier.fillMaxSize())
+                is AsyncImagePainter.State.Success ->
+                    SubcomposeAsyncImageContent()
+                else -> Box(
+                    Modifier.fillMaxSize().background(GfColor.Surface).border(1.dp, GfColor.Hairline08, RoundedCornerShape(22.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(MuscleIcon.of(muscle), null, tint = GfColor.Lime, modifier = Modifier.offset(y = bob.dp).size(72.dp))
+                }
             }
         }
 

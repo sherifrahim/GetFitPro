@@ -1,0 +1,15 @@
+[   12962ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://static.exercisedb.dev/media/01qpYSe.gif:0
+[   13305ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://cdn.exercisedb.dev/media/01qpYSe.gif:0
+[   13806ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://cdn.exercisedb.dev/exercisedb/media/01qpYSe.gif:0
+[   14197ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://cdn.exercisedb.dev/exercises/gifs/01qpYSe.gif:0
+[   14573ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://cdn.exercisedb.dev/gifs/01qpYSe.gif:0
+[   14648ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://oss.exercisedb.dev/media/01qpYSe.gif:0
+[   14714ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://oss.exercisedb.dev/api/v1/exercises/01qpYSe/image:0
+[   58362ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://media.exercisedb.dev/01qpYSe.gif:0
+[  104003ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://d205bpvrqc9yn1.cloudfront.net/media/0001.gif:0
+[  104091ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://d205bpvrqc9yn1.cloudfront.net/media/01qpYSe.gif:0
+[  104174ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://d205bpvrqc9yn1.cloudfront.net/0001.gif:0
+[  104339ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://api.exercisedb.io/image/01qpYSe:0
+[  135896ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://oss.exercisedb.dev/api/v1/images/01qpYSe.gif:0
+[  135970ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://oss.exercisedb.dev/api/v1/exercises/01qpYSe/image:0
+[  136041ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://oss.exercisedb.dev/static/gifs/01qpYSe.gif:0
