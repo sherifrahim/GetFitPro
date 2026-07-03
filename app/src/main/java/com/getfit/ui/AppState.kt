@@ -31,6 +31,7 @@ data class NavState(
     val booted: Boolean = false,
     val charted: Boolean = false,
     val confirmClear: Boolean = false,
+    val obSlide: Int = 0,
     val goalEx: String = "bench",
     val goalTarget: Double = 110.0,
     val goalWeeks: Int = 8,

@@ -109,6 +109,11 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     // ---- onboarding ----
     fun finishOnboarding() = viewModelScope.launch { settingsStore.setOnboarded(true) }
+    fun obNext() {
+        if (_nav.value.obSlide < 2) _nav.update { it.copy(obSlide = it.obSlide + 1) } else finishOnboarding()
+    }
+    fun obSkip() = finishOnboarding()
+    fun obSetSlide(i: Int) = _nav.update { it.copy(obSlide = i) }
 
     // ---- goals ----
     fun goalCur(id: String): Double {

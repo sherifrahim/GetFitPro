@@ -33,15 +33,18 @@ import com.getfit.ui.builder.BuilderScreen
 import com.getfit.ui.detail.DetailScreen
 import com.getfit.ui.exercises.ExercisesScreen
 import com.getfit.ui.home.HomeScreen
+import com.getfit.ui.onboarding.OnboardingScreen
 import com.getfit.ui.progress.GoalSheet
 import com.getfit.ui.progress.ProgressScreen
 import com.getfit.ui.session.SessionScreen
+import com.getfit.ui.settings.SettingsScreen
 import com.getfit.ui.splash.SplashScreen
 
 /** Tab shell + full-screen overlays + toast host. */
 @Composable
 fun RootScaffold(vm: AppViewModel) {
     val nav by vm.nav.collectAsState()
+    val settings by vm.settings.collectAsState()
 
     Box(Modifier.fillMaxSize().background(GfColor.Background)) {
 
@@ -75,6 +78,15 @@ fun RootScaffold(vm: AppViewModel) {
             nav.detailId?.let { DetailScreen(vm, it) }
         }
 
+        // Settings overlay
+        AnimatedVisibility(
+            visible = nav.settingsOpen,
+            enter = slideInVertically(tween(350)) { it },
+            exit = slideOutVertically(tween(300)) { it },
+        ) {
+            SettingsScreen(vm)
+        }
+
         // Goal bottom sheet
         AnimatedVisibility(visible = nav.goalOpen, enter = fadeIn(tween(250)), exit = fadeOut(tween(200))) {
             GoalSheet(vm)
@@ -91,6 +103,11 @@ fun RootScaffold(vm: AppViewModel) {
             AnimatedVisibility(visible = nav.toast != null) {
                 nav.toast?.let { GfToast(it.text, msIcon(it.icon)) }
             }
+        }
+
+        // Onboarding (first run)
+        AnimatedVisibility(visible = nav.booted && !settings.onboarded, enter = fadeIn(tween(400)), exit = fadeOut(tween(300))) {
+            OnboardingScreen(vm)
         }
 
         // Splash
