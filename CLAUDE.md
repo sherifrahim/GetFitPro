@@ -1,0 +1,98 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this repo is
+
+A **native Android port of the GetFit fitness app**. The app currently exists only as a
+high-fidelity, fully-working HTML/JS prototype — `GetFit.dc.html`. That prototype is the
+**source of truth** for layout, visual design, copy, interactions, animations, and — critically —
+**all state/business logic**. The Android app (Kotlin + Jetpack Compose) is being built to look
+and behave identically.
+
+> Status: the Compose/Gradle project is **not scaffolded yet**. Only the prototype, docs, and
+> planning artifacts exist. The build order lives in `docs/superpowers/plans/`.
+
+## Source of truth: `GetFit.dc.html`
+
+Read it before touching a feature. It is a single-file app in a custom React-like framework
+(`<x-dc>` templating + a `DCLogic` component class). The important parts:
+
+- **Markup** (lines ~37–671): every screen and overlay, with exact colors/sizes/copy/animations
+  inlined as styles. Template bindings look like `{{ x }}`, loops `<sc-for>`, conditionals `<sc-if>`.
+- **Logic** (`<script data-dc-script>`, lines ~673–1058): the `Component extends DCLogic` class holds
+  the entire state model, seed data, and all computed values in `renderVals()`. **This is the Kotlin
+  logic spec.** Port its behavior exactly; do not "improve" the math.
+
+## Logic that must stay byte-for-byte faithful
+
+These are load-bearing and easy to get subtly wrong. When porting, add unit tests that reproduce the
+prototype's outputs:
+
+- **PR / personal best** (`bestFor`): weighted lifts → max weight, tiebreak on reps, estimated 1RM =
+  `round(w * (1 + reps/30))`. Bodyweight lifts → max reps, no weight/1RM.
+- **Bodyweight test** (`isBW`): `equipment == "Bodyweight"` **or** the rep string ends in `s`
+  (time-based holds like `"45s"`). BW exercises track reps, never weight; steppers hide weight.
+- **Streak** (`streakCount`): consecutive calendar days with ≥1 session, counting back from today
+  (today optional — if no session today, start from yesterday).
+- **Week aggregation**: week starts **Monday** (`(getDay()+6)%7`). Per-day volume drives the bar chart;
+  weekly goal is **5 sessions**.
+- **Session state machine** (`startSession` → `tick` → `doneSet` → `advanceFromRest` → `endSession`):
+  work/rest phases, 1s ticker, PR checked on every logged set, volume accumulates (weighted only),
+  a `history` record is written on end. Weight prefilled from last logged set, else `DEFAULTW`, else 20.
+- **Persistence**: seed-on-first-launch (`SEED`, `DEFAULTW`, `DEFAULT_PLAN`, 2 demo targets);
+  "Clear all data" wipes and resets to the same seed. Prototype uses `localStorage getfit_v1`;
+  Android uses Room + DataStore.
+
+## Data & media
+
+- Dataset: `warpirate/exercises-dataset` → `data/exercises.json` — **1,324 exercises**
+  (fields: `id, name, category, body_part, equipment, target, muscle_group, secondary_muscles,
+  instructions{en,es,…}, media_id`). Ship it in `assets/` and seed Room on first launch.
+- **Media is NOT in the dataset.** Each record has a `media_id` referencing ExerciseDB
+  (`static.exercisedb.dev/media/{media_id}.gif`), but the GIFs are not redistributed, the CDN blocks
+  hotlinking, and ownership is disputed. The app loads demos via a single `Constants.MEDIA_BASE`
+  config value (empty for now) with Coil + `coil-gif`, a shimmer while loading, and an animated-icon
+  fallback on empty/failure. **The animation-hosting decision is deferred** — do not hardcode a media
+  host; keep it behind `MEDIA_BASE` so it can be flipped without code changes.
+
+## Target architecture (Kotlin + Compose)
+
+Single-activity, Compose-only, **manual DI** (no Hilt): an `AppContainer` builds the Room db,
+DataStore, repos, and a ViewModel factory. Clean layering:
+
+- `core/` — `theme/` (all prototype tokens: colors, Space Grotesk + Manrope fonts, shapes),
+  `anim/` (spring specs, count-ups, PR celebration, stagger), `ui/` (reusable atoms).
+- `data/` — `db/` (Room entities + DAOs + seeder), `prefs/` (DataStore settings + plan),
+  `repo/`. Entities: `ExerciseEntity` (seeded), `SetLogEntity` (one row per logged set),
+  `SessionEntity` (+sets relation, = history), `TargetEntity`.
+- `domain/` — pure Kotlin for the load-bearing math above; unit-tested against prototype values.
+- `ui/` — per-screen `Screen.kt` + `ViewModel.kt` + `UiState`, plus `nav/`.
+
+Navigation: bottom-tab `NavHost` (Home / Exercises / Build / Progress) with a spring-animated sliding
+indicator; Detail / Session / Settings / Onboarding / Splash are top-level routes above the tab
+scaffold; GoalSheet + Toast are state-driven overlays. All motion via Compose Animation
+(`animate*AsState`, `AnimatedContent`, `updateTransition`, `Animatable` springs) — CSS keyframes in the
+prototype map to these (see the design doc for the table).
+
+## Commands
+
+Android toolchain (apply once the Gradle module is scaffolded — min SDK 26, target latest, Compose BOM, KTS):
+
+```bash
+./gradlew assembleDebug            # build
+./gradlew installDebug             # build + install on device/emulator
+./gradlew testDebugUnitTest        # JVM unit tests (domain logic)
+./gradlew testDebugUnitTest --tests "com.getfit.domain.PrTest"   # single test class
+./gradlew connectedDebugAndroidTest   # instrumented/Compose UI tests
+./gradlew lintDebug                # Android lint
+```
+
+## Planning artifacts
+
+- `docs/superpowers/specs/` — the approved design/spec.
+- `docs/superpowers/plans/` — the phased implementation plan (build order: design system → nav shell →
+  data layer + domain tests → Home → Exercises → Detail → Builder → Session → Progress → Settings →
+  Onboarding/Splash → animation polish).
+
+Work through screens in that order. When a value is unclear, open `GetFit.dc.html` and copy it exactly.
