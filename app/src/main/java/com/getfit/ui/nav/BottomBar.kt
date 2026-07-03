@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -97,11 +98,6 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, modifier: Modifier =
                 }
             }
         }
-        Box(
-            Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(Modifier.size(width = 120.dp, height = 5.dp).clip(RoundedCornerShape(3.dp)).background(GfColor.Text.copy(alpha = 0.35f)))
-        }
+        Spacer(Modifier.height(6.dp))
     }
 }
