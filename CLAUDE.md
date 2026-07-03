@@ -10,8 +10,22 @@ high-fidelity, fully-working HTML/JS prototype — `GetFit.dc.html`. That protot
 **all state/business logic**. The Android app (Kotlin + Jetpack Compose) is being built to look
 and behave identically.
 
-> Status: the Compose/Gradle project is **not scaffolded yet**. Only the prototype, docs, and
-> planning artifacts exist. The build order lives in `docs/superpowers/plans/`.
+> Status: **built and running.** The Android app lives in `app/` (Kotlin + Compose). All 12
+> planned phases are implemented and verified on an emulator: splash → onboarding → home →
+> exercises → detail → builder → guided session → progress → settings, hydrated from Room +
+> DataStore. Domain logic + seeding are unit-tested (`app/src/test/…`, 28 tests). Build on the
+> `feat/android-mvp` branch. The build order/spec live in `docs/superpowers/`.
+
+## UI architecture note (important)
+
+The prototype is a single `DCLogic` component that computes everything in one `renderVals()`.
+The Android port mirrors this with **one `AppViewModel`** (`ui/AppViewModel.kt`) that combines all
+repos into an `AppData` snapshot + holds transient nav/overlay state (`NavState`), plus a
+`SessionController` for the guided session. Per-screen composables under `ui/<screen>/` are thin —
+they read `vm.data` / `vm.settings` / `vm.nav` and call VM actions. This is a deliberate choice over
+per-screen ViewModels: it avoids re-deriving shared state (best-map, streak, plan) in multiple places
+and keeps the port faithful to the single source of truth. `RootScaffold` renders the tab content +
+all overlays (detail, session, settings, onboarding, splash, goal sheet, toast).
 
 ## Source of truth: `GetFit.dc.html`
 
