@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -29,6 +30,7 @@ import com.getfit.ui.TAB_BUILD
 import com.getfit.ui.TAB_EXERCISES
 import com.getfit.ui.TAB_PROGRESS
 import com.getfit.ui.builder.BuilderScreen
+import com.getfit.ui.detail.DetailScreen
 import com.getfit.ui.exercises.ExercisesScreen
 import com.getfit.ui.home.HomeScreen
 import com.getfit.ui.progress.ProgressScreen
@@ -60,6 +62,15 @@ fun RootScaffold(vm: AppViewModel) {
                 }
             }
             BottomBar(nav.tab, vm::selectTab, Modifier.navigationBarsPadding())
+        }
+
+        // Exercise detail overlay
+        AnimatedVisibility(
+            visible = nav.detailId != null,
+            enter = slideInVertically(tween(400)) { it },
+            exit = slideOutVertically(tween(300)) { it },
+        ) {
+            nav.detailId?.let { DetailScreen(vm, it) }
         }
 
         // Toast
