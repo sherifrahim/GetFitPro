@@ -145,12 +145,13 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     }
     fun deleteTarget(id: String) = viewModelScope.launch { progressRepo.deleteTarget(id) }
 
-    // ---- session (implemented in Phase 10) ----
-    fun startSession(items: List<PlanItemData>) { sessionController.start(items) }
-    fun startSingle(id: String, reps: String) { sessionController.start(listOf(PlanItemData(id, 3, reps))) }
-
+    // ---- session ----
     val sessionController = SessionController(container, viewModelScope) { text, icon -> toast(text, icon) }
     val session get() = sessionController.state
+
+    fun startSession(items: List<PlanItemData>) { sessionController.start(items) }
+    fun startSingle(id: String, reps: String) { sessionController.start(listOf(PlanItemData(id, 3, reps))) }
+    fun endSession() = viewModelScope.launch { sessionController.endAndSave(); selectTab(TAB_PROGRESS) }
 
     // ---- toast ----
     fun toast(text: String, icon: String = "check_circle") {

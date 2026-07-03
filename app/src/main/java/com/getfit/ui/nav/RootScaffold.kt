@@ -34,6 +34,7 @@ import com.getfit.ui.detail.DetailScreen
 import com.getfit.ui.exercises.ExercisesScreen
 import com.getfit.ui.home.HomeScreen
 import com.getfit.ui.progress.ProgressScreen
+import com.getfit.ui.session.SessionScreen
 import com.getfit.ui.splash.SplashScreen
 
 /** Tab shell + full-screen overlays + toast host. */
@@ -71,6 +72,12 @@ fun RootScaffold(vm: AppViewModel) {
             exit = slideOutVertically(tween(300)) { it },
         ) {
             nav.detailId?.let { DetailScreen(vm, it) }
+        }
+
+        // Guided session (top-most)
+        val session by vm.session.collectAsState()
+        AnimatedVisibility(visible = session != null, enter = fadeIn(tween(300)), exit = fadeOut(tween(250))) {
+            SessionScreen(vm)
         }
 
         // Toast
