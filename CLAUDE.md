@@ -63,15 +63,16 @@ prototype's outputs:
 - Dataset: `warpirate/exercises-dataset` → `data/exercises.json` — **1,324 exercises**
   (fields: `id, name, category, body_part, equipment, target, muscle_group, secondary_muscles,
   instructions{en,es,…}, media_id`). Ship it in `assets/` and seed Room on first launch.
-- **Media is NOT in the dataset.** Each record has a `media_id`. Verified against the free ExerciseDB
-  v1 API (`https://oss.exercisedb.dev/api/v1/exercises`, keyless): each exercise's `gifUrl` is
-  `https://static.exercisedb.dev/media/{id}.gif`, and that `{id}` is the same code as our `media_id`.
-  So `Constants.MEDIA_BASE = "https://static.exercisedb.dev/media/"` + `media_id` is the correct GIF URL.
-  **Caveat: as of 2026-07 that host is NXDOMAIN (CDN down)**, so demos fall back to the animated icon.
-  The detail demo uses `SubcomposeAsyncImage` (shimmer → gif on success → animated-icon on error/empty),
-  so a dead/blank host degrades gracefully. To enable GIFs, point `MEDIA_BASE` at a live mirror/host —
-  no other code changes. The `oss.exercisedb.dev` API also has richer data (step instructions, target +
-  secondary muscles) if a future re-seed is wanted.
+- **Media is NOT in the dataset**, but demos DO animate. Each record's `media_id` is the ExerciseDB v1
+  media code (squat = `qXTaZnJ`). The official host `static.exercisedb.dev` is dead (NXDOMAIN), so
+  `Constants.MEDIA_BASE` points at a **community mirror served free via jsdelivr**
+  (`cdn.jsdelivr.net/gh/andresmonc/LogWell@<sha>/assets/exercise-gif/` + `{media_id}.gif`), pinned to a
+  commit SHA (immutable, cached permanently by jsdelivr). Verified loading on device. The detail demo
+  uses `SubcomposeAsyncImage` (shimmer → gif on success → animated-icon fallback on missing/error), so
+  ids absent from the mirror degrade gracefully.
+  **TODO(prod):** self-host these GIFs (own bucket/CDN) rather than depend on a third-party repo — then
+  just change `MEDIA_BASE`. The free `oss.exercisedb.dev/api/v1` API also has richer data (step
+  instructions, target + secondary muscles) for a future re-seed.
 
 ## Target architecture (Kotlin + Compose)
 
