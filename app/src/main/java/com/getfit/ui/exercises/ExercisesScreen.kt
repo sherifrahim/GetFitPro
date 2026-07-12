@@ -54,6 +54,7 @@ import com.getfit.ui.AppViewModel
 fun ExercisesScreen(vm: AppViewModel) {
     val data by vm.data.collectAsState()
     val nav by vm.nav.collectAsState()
+    val settings by vm.settings.collectAsState()
 
     val q = nav.query.trim().lowercase()
     val filtered = remember(data.exercises, nav.query, nav.filter) {
@@ -87,7 +88,7 @@ fun ExercisesScreen(vm: AppViewModel) {
             }
         }
         items(filtered, key = { it.id }) { ex ->
-            ExerciseRow(ex, best = data.bestMap[ex.id], units = vm.settings.value.units,
+            ExerciseRow(ex, best = data.bestMap[ex.id], units = settings.units,
                 onOpen = { vm.openDetail(ex.id) }, onAdd = { vm.addToPlan(ex.id) })
             Spacer(Modifier.height(10.dp))
         }

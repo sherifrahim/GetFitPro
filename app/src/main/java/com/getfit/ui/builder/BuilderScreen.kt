@@ -42,6 +42,7 @@ import com.getfit.data.db.Curated
 import com.getfit.data.prefs.PlanItemData
 import com.getfit.domain.Units
 import com.getfit.domain.isBW
+import com.getfit.ui.AppData
 import com.getfit.ui.AppViewModel
 
 @Composable
@@ -92,7 +93,7 @@ fun BuilderScreen(vm: AppViewModel) {
                 PlanRow(
                     item = item,
                     exName = data.exercise(item.id)?.name ?: item.id,
-                    sub = subFor(vm, item.id, settings.units),
+                    sub = subFor(data, item.id, settings.units),
                     isFirst = i == 0, isLast = i == data.plan.lastIndex,
                     onUp = { vm.movePlan(i, -1) }, onDown = { vm.movePlan(i, 1) },
                     onLess = { vm.setSets(item.id, -1) }, onMore = { vm.setSets(item.id, 1) },
@@ -130,8 +131,7 @@ fun BuilderScreen(vm: AppViewModel) {
     }
 }
 
-private fun subFor(vm: AppViewModel, id: String, units: String): String {
-    val data = vm.data.value
+private fun subFor(data: AppData, id: String, units: String): String {
     val ex = data.exercise(id) ?: return ""
     val best = data.bestMap[id] ?: return ex.muscle
     return if (isBW(ex.equipment, ex.reps)) "Best ${best.reps} reps" else "Best ${Units.fmtDisplay(best.weight, units)} $units"

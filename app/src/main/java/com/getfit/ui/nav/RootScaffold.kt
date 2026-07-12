@@ -1,5 +1,6 @@
 package com.getfit.ui.nav
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,6 +29,7 @@ import com.getfit.core.ui.msIcon
 import com.getfit.ui.AppViewModel
 import com.getfit.ui.TAB_BUILD
 import com.getfit.ui.TAB_EXERCISES
+import com.getfit.ui.TAB_HOME
 import com.getfit.ui.TAB_PROGRESS
 import com.getfit.ui.builder.BuilderScreen
 import com.getfit.ui.detail.DetailScreen
@@ -45,6 +47,9 @@ import com.getfit.ui.splash.SplashScreen
 fun RootScaffold(vm: AppViewModel) {
     val nav by vm.nav.collectAsState()
     val settings by vm.settings.collectAsState()
+
+    // Lowest priority: any non-Home tab goes back to Home before the system handles back (exit).
+    BackHandler(enabled = nav.tab != TAB_HOME) { vm.selectTab(TAB_HOME) }
 
     Box(Modifier.fillMaxSize().background(GfColor.Background)) {
 
@@ -70,6 +75,7 @@ fun RootScaffold(vm: AppViewModel) {
         }
 
         // Exercise detail overlay
+        BackHandler(enabled = nav.detailId != null) { vm.closeDetail() }
         AnimatedVisibility(
             visible = nav.detailId != null,
             enter = slideInVertically(tween(400)) { it },
@@ -79,6 +85,7 @@ fun RootScaffold(vm: AppViewModel) {
         }
 
         // Settings overlay
+        BackHandler(enabled = nav.settingsOpen) { vm.closeSettings() }
         AnimatedVisibility(
             visible = nav.settingsOpen,
             enter = slideInVertically(tween(350)) { it },
@@ -88,12 +95,14 @@ fun RootScaffold(vm: AppViewModel) {
         }
 
         // Goal bottom sheet
+        BackHandler(enabled = nav.goalOpen) { vm.closeGoal() }
         AnimatedVisibility(visible = nav.goalOpen, enter = fadeIn(tween(250)), exit = fadeOut(tween(200))) {
             GoalSheet(vm)
         }
 
         // Guided session (top-most)
         val session by vm.session.collectAsState()
+        BackHandler(enabled = session != null) { vm.endSession() }
         AnimatedVisibility(visible = session != null, enter = fadeIn(tween(300)), exit = fadeOut(tween(250))) {
             SessionScreen(vm)
         }

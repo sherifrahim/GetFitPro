@@ -86,7 +86,7 @@ fun DetailScreen(vm: AppViewModel, id: String) {
 
     Column(Modifier.fillMaxSize().background(GfColor.Background).statusBarsPadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            DemoStage(mediaId = ex.mediaId, gifUrl = Constants.gifUrl(ex.mediaId), muscle = ex.muscle, onClose = vm::closeDetail)
+            DemoStage(gifUrl = Constants.gifUrl(ex.mediaId), muscle = ex.muscle, onClose = vm::closeDetail)
 
             Column(Modifier.padding(horizontal = 20.dp, vertical = 20.dp)) {
                 Text(ex.name, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 25.sp, lineHeight = 29.sp)
@@ -197,7 +197,7 @@ fun DetailScreen(vm: AppViewModel, id: String) {
 }
 
 @Composable
-private fun DemoStage(mediaId: String?, gifUrl: String, muscle: String, onClose: () -> Unit) {
+private fun DemoStage(gifUrl: String, muscle: String, onClose: () -> Unit) {
     val infinite = rememberInfiniteTransition(label = "demo")
     val angle by infinite.animateFloat(0f, 360f, infiniteRepeatable(tween(22000, easing = LinearEasing), RepeatMode.Restart), label = "ring")
     val bob by infinite.animateFloat(-10f, 10f, infiniteRepeatable(tween(2400), RepeatMode.Reverse), label = "bob")
@@ -242,14 +242,6 @@ private fun DemoStage(mediaId: String?, gifUrl: String, muscle: String, onClose:
             contentAlignment = Alignment.Center,
         ) {
             Icon(msIcon("arrow_back"), null, tint = GfColor.Text, modifier = Modifier.size(24.dp))
-        }
-        // caption
-        Row(
-            Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp).clip(Pill).background(Color(0xB8171210)).border(1.dp, GfColor.Hairline10, Pill).padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Icon(msIcon("smart_display"), null, tint = GfColor.Lime, modifier = Modifier.size(14.dp))
-            Text("media_id · ${mediaId ?: "not set"}", color = GfColor.TextDim, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W600, fontSize = 11.sp)
         }
     }
 }
