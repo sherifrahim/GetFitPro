@@ -60,7 +60,7 @@ prototype's outputs:
 
 ## Data & media
 
-- Dataset: `warpirate/exercises-dataset` → `data/exercises.json` — **1,324 exercises**
+- Dataset: `warpirate/exercises-dataset` → `data/exercises.json` — **1,342 exercises**
   (fields: `id, name, category, body_part, equipment, target, muscle_group, secondary_muscles,
   instructions{en,es,…}, media_id`). Ship it in `assets/` and seed Room on first launch.
 - **Media is NOT in the dataset**, but demos DO animate. Each record's `media_id` is the ExerciseDB v1
