@@ -1,5 +1,7 @@
 package com.getfit.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,19 +22,27 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.getfit.core.theme.GfColor
@@ -46,6 +56,7 @@ import com.getfit.ui.AppViewModel
 fun SettingsScreen(vm: AppViewModel) {
     val settings by vm.settings.collectAsState()
     val nav by vm.nav.collectAsState()
+    val hasAiKey by vm.hasAiKey.collectAsState()
 
     Column(Modifier.fillMaxSize().background(GfColor.Background).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -103,6 +114,15 @@ fun SettingsScreen(vm: AppViewModel) {
                 }
             }
 
+            SectionLabel("AI coach")
+            AiKeySection(hasAiKey = hasAiKey, model = settings.aiModel, vm = vm)
+
+            SectionLabel("Import & export")
+            ImportExportSection(vm)
+
+            SectionLabel("Cloud sync")
+            SyncSection(vm)
+
             // clear all
             val confirm = nav.confirmClear
             Row(
@@ -121,7 +141,7 @@ fun SettingsScreen(vm: AppViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Icon(msIcon("lock"), null, tint = GfColor.Lime, modifier = Modifier.size(20.dp))
-                Text("Private by design. Everything — your logs, PRs and targets — stays on your device. No account, no cloud.", color = GfColor.TextCue, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 13.sp, lineHeight = 20.sp)
+                Text("Private by design. Everything — your logs, PRs and targets — stays on your device, with no account required. AI review and sync are opt-in and only reach the network when you turn them on.", color = GfColor.TextCue, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 13.sp, lineHeight = 20.sp)
             }
         }
     }
@@ -154,6 +174,219 @@ private fun GfSwitch(on: Boolean) {
         contentAlignment = Alignment.CenterStart,
     ) {
         Box(Modifier.offset(x = knobX).size(21.dp).clip(Pill).background(Color.White))
+    }
+}
+
+@Composable
+private fun AiKeySection(hasAiKey: Boolean, model: String, vm: AppViewModel) {
+    var keyInput by remember { mutableStateOf("") }
+    var modelInput by remember(model) { mutableStateOf(model) }
+    var reveal by remember { mutableStateOf(false) }
+
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.Surface)
+            .border(1.dp, GfColor.Hairline06, RoundedCornerShape(20.dp)).padding(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(msIcon(if (hasAiKey) "check_circle" else "info"), null, tint = if (hasAiKey) GfColor.Lime else GfColor.TextFaint, modifier = Modifier.size(16.dp))
+            Text(
+                if (hasAiKey) "API key saved" else "No API key set", color = GfColor.TextDim, fontFamily = Manrope,
+                fontWeight = FontWeight.W600, fontSize = 12.5.sp,
+            )
+        }
+        Text(
+            "Bring your own Anthropic API key — it's encrypted on-device and only ever sent to " +
+                "Anthropic's API when you ask for a review. Get one at console.anthropic.com.",
+            color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp,
+            lineHeight = 17.sp, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
+        )
+
+        GfTextField(
+            value = keyInput, onValueChange = { keyInput = it },
+            placeholder = if (hasAiKey) "New key (leave blank to keep current)" else "sk-ant-...",
+            masked = !reveal,
+        )
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (reveal) "Hide" else "Show", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.sp,
+                modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null) { reveal = !reveal },
+            )
+            Row {
+                if (hasAiKey) {
+                    Text(
+                        "Remove key", color = GfColor.Coral, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
+                        modifier = Modifier.padding(end = 18.dp).clickable(remember { MutableInteractionSource() }, indication = null) { vm.clearAiApiKey() },
+                    )
+                }
+                Text(
+                    "Save", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
+                    modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null) {
+                        if (keyInput.isNotBlank()) { vm.setAiApiKey(keyInput); keyInput = "" }
+                    },
+                )
+            }
+        }
+
+        Text("MODEL", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 10.5.sp, letterSpacing = 1.sp, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
+        GfTextField(
+            value = modelInput, onValueChange = { modelInput = it }, placeholder = "claude-sonnet-4-5", masked = false,
+        )
+        LaunchedEffect(modelInput) {
+            // Debounce-free: this is a rarely-typed field, save on every change is fine.
+            if (modelInput.isNotBlank() && modelInput != model) vm.setAiModel(modelInput)
+        }
+    }
+}
+
+@Composable
+private fun ImportExportSection(vm: AppViewModel) {
+    val context = LocalContext.current
+    val state by vm.importExport.collectAsState()
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { vm.importCsv(context.contentResolver, it) }
+    }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        uri?.let { vm.exportCsv(context.contentResolver, it) }
+    }
+
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.Surface)
+            .border(1.dp, GfColor.Hairline06, RoundedCornerShape(20.dp)),
+    ) {
+        Row(
+            Modifier.fillMaxWidth()
+                .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !state.busy) { importLauncher.launch("*/*") }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(msIcon("keyboard_arrow_down"), null, tint = GfColor.Lime, modifier = Modifier.size(22.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Import workouts", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.5.sp)
+                Text("From Hevy, Strong, FitNotes or a Forge export (.csv)", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+            Icon(msIcon("chevron_right"), null, tint = GfColor.TextFaint, modifier = Modifier.size(20.dp))
+        }
+        Divider()
+        Row(
+            Modifier.fillMaxWidth()
+                .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !state.busy) { exportLauncher.launch("forge_export.csv") }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(msIcon("keyboard_arrow_up"), null, tint = GfColor.Lime, modifier = Modifier.size(22.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Export workouts", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.5.sp)
+                Text("Every logged set as a re-importable .csv", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+            Icon(msIcon("chevron_right"), null, tint = GfColor.TextFaint, modifier = Modifier.size(20.dp))
+        }
+        if (state.busy || state.lastResult != null || state.lastError != null) {
+            Divider()
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                when {
+                    state.busy -> {
+                        Icon(msIcon("monitoring"), null, tint = GfColor.TextFaint, modifier = Modifier.size(16.dp))
+                        Text("Working…", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp)
+                    }
+                    state.lastError != null -> {
+                        Icon(msIcon("warning"), null, tint = GfColor.Coral, modifier = Modifier.size(16.dp))
+                        Text(state.lastError.orEmpty(), color = GfColor.Coral, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, lineHeight = 17.sp)
+                    }
+                    else -> {
+                        Icon(msIcon("check_circle"), null, tint = GfColor.Lime, modifier = Modifier.size(16.dp))
+                        Text(state.lastResult.orEmpty(), color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, lineHeight = 17.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SyncSection(vm: AppViewModel) {
+    val ui by vm.syncUi.collectAsState()
+    var urlInput by remember(ui.state.serverUrl) { mutableStateOf(ui.state.serverUrl) }
+    val connected = ui.state.serverUrl.isNotBlank()
+
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.Surface)
+            .border(1.dp, GfColor.Hairline06, RoundedCornerShape(20.dp)).padding(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(msIcon(if (connected) "check_circle" else "info"), null, tint = if (connected) GfColor.Lime else GfColor.TextFaint, modifier = Modifier.size(16.dp))
+            Text(
+                if (connected) "Server configured" else "No sync server set", color = GfColor.TextDim, fontFamily = Manrope,
+                fontWeight = FontWeight.W600, fontSize = 12.5.sp,
+            )
+        }
+        Text(
+            "Point this at your own Oracle-hosted sync endpoint to back up and sync your logs across " +
+                "devices. This is early groundwork — your data stays fully usable on-device whether or not it's set.",
+            color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp,
+            lineHeight = 17.sp, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
+        )
+
+        GfTextField(value = urlInput, onValueChange = { urlInput = it }, placeholder = "https://your-server.example.com", masked = false)
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+            Text(
+                "Save", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
+                modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null) { vm.setSyncServerUrl(urlInput) },
+            )
+        }
+
+        Divider()
+
+        val pending = ui.state.queue.size
+        Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (pending == 0) "Up to date" else "$pending change${if (pending == 1) "" else "s"} queued",
+                    color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.5.sp,
+                )
+                when {
+                    ui.state.lastError != null -> Text(ui.state.lastError.orEmpty(), color = GfColor.Coral, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
+                    ui.state.lastSyncAtMs > 0 -> Text("Last synced ${relativeTime(ui.state.lastSyncAtMs)}", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
+                }
+            }
+            Box(
+                Modifier.clip(RoundedCornerShape(12.dp)).background(if (ui.busy) GfColor.Hairline12 else GfColor.Lime)
+                    .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !ui.busy) { vm.syncNow() }
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            ) {
+                Text(if (ui.busy) "Syncing…" else "Sync now", color = if (ui.busy) GfColor.TextDim else GfColor.OnAccent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+private fun relativeTime(ms: Long): String {
+    val mins = (System.currentTimeMillis() - ms) / 60_000
+    return when {
+        mins < 1 -> "just now"
+        mins < 60 -> "${mins}m ago"
+        mins < 1440 -> "${mins / 60}h ago"
+        else -> "${mins / 1440}d ago"
+    }
+}
+
+@Composable
+private fun GfTextField(value: String, onValueChange: (String) -> Unit, placeholder: String, masked: Boolean) {
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(GfColor.Background)
+            .border(1.dp, GfColor.Hairline08, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        if (value.isEmpty()) {
+            Text(placeholder, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 13.5.sp)
+        }
+        BasicTextField(
+            value = value, onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.5.sp),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(GfColor.Lime),
+            visualTransformation = if (masked) PasswordVisualTransformation() else VisualTransformation.None,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

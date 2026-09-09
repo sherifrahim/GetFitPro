@@ -9,9 +9,13 @@ import com.getfit.data.db.GetFitDatabase
 import com.getfit.data.db.Seeder
 import com.getfit.data.prefs.PlanStore
 import com.getfit.data.prefs.SettingsStore
+import com.getfit.data.importexport.ImportExportRepo
 import com.getfit.data.repo.ExerciseRepo
 import com.getfit.data.repo.ProgressRepo
 import com.getfit.data.repo.WorkoutRepo
+import com.getfit.data.security.SecureKeyStore
+import com.getfit.data.sync.SyncRepo
+import com.getfit.data.sync.SyncStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,10 +35,14 @@ class AppContainer(private val appContext: Context) {
     val settingsStore = SettingsStore(appContext.dataStore)
     val planStore = PlanStore(appContext.dataStore)
     val sessionStore = com.getfit.data.prefs.SessionStore(appContext.dataStore)
+    val secureKeyStore = SecureKeyStore(appContext.dataStore)
+    val syncStore = SyncStore(appContext.dataStore)
+    val syncRepo = SyncRepo(syncStore)
 
     val exerciseRepo = ExerciseRepo(db.exerciseDao(), db.logDao())
-    val workoutRepo = WorkoutRepo(planStore, db.exerciseDao(), db.logDao(), db.sessionDao())
-    val progressRepo = ProgressRepo(db.sessionDao(), db.targetDao())
+    val workoutRepo = WorkoutRepo(planStore, db.exerciseDao(), db.logDao(), db.sessionDao(), syncRepo)
+    val progressRepo = ProgressRepo(db.sessionDao(), db.targetDao(), syncRepo)
+    val importExportRepo = ImportExportRepo(db.exerciseDao(), db.logDao(), db.sessionDao())
 
     /** Seed the library + demo data on first launch (idempotent). */
     fun seedOnFirstLaunch() {

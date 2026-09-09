@@ -31,6 +31,7 @@ import com.getfit.ui.TAB_BUILD
 import com.getfit.ui.TAB_EXERCISES
 import com.getfit.ui.TAB_HOME
 import com.getfit.ui.TAB_PROGRESS
+import com.getfit.ui.ai.AiReviewScreen
 import com.getfit.ui.builder.BuilderScreen
 import com.getfit.ui.detail.DetailScreen
 import com.getfit.ui.exercises.ExercisesScreen
@@ -98,6 +99,16 @@ fun RootScaffold(vm: AppViewModel) {
         BackHandler(enabled = nav.goalOpen) { vm.closeGoal() }
         AnimatedVisibility(visible = nav.goalOpen, enter = fadeIn(tween(250)), exit = fadeOut(tween(200))) {
             GoalSheet(vm)
+        }
+
+        // AI review overlay
+        BackHandler(enabled = nav.aiReviewOpen) { vm.closeAiReview() }
+        AnimatedVisibility(
+            visible = nav.aiReviewOpen,
+            enter = slideInVertically(tween(350)) { it },
+            exit = slideOutVertically(tween(300)) { it },
+        ) {
+            AiReviewScreen(vm)
         }
 
         // Guided session (top-most)

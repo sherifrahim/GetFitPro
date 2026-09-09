@@ -56,6 +56,12 @@ interface SessionDao {
     @Query("SELECT * FROM sessions ORDER BY dateMs DESC")
     fun observeAll(): Flow<List<SessionEntity>>
 
+    @Query("SELECT * FROM sessions ORDER BY dateMs ASC")
+    suspend fun allOnce(): List<SessionEntity>
+
+    @Query("SELECT * FROM session_sets")
+    suspend fun allSetsOnce(): List<SessionSetEntity>
+
     @Query("DELETE FROM sessions")
     suspend fun clearSessions()
 

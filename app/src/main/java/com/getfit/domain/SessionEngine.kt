@@ -6,6 +6,14 @@ import kotlinx.serialization.Serializable
  * Pure work/rest session state machine, ported from the prototype (L836-893).
  * All transitions are pure functions on an immutable SessionState — no Android, fully unit-tested.
  * Serializable so an in-progress session survives process death (persisted via DataStore).
+ *
+ * Timing is wall-clock anchored, not tick-counted: [workStartedAtMs]/[pausedAccumMs] derive
+ * [elapsed] and [restEndAtMs] derives [restLeft]. [tick] recomputes both from `now` on every call
+ * instead of blindly subtracting 1, so a delayed or missed tick (Doze, a backgrounded coroutine,
+ * even a killed-and-restored process) self-corrects to the true elapsed time instead of drifting.
+ * [restLeft]/[elapsed] stay as plain stored Int fields — kept in sync by every function below —
+ * so existing UI call sites (SessionScreen.kt) that just read `s.restLeft` / `s.elapsed` need no
+ * changes.
  */
 
 @Serializable
@@ -45,6 +53,11 @@ data class SessionState(
     val preBest: Map<String, Pair<Double, Int>> = emptyMap(),
     val curW: Double = 0.0,
     val curR: Int = 10,
+    // Wall-clock anchors (epoch ms). Source of truth for elapsed/restLeft; see class doc.
+    val workStartedAtMs: Long = 0,
+    val pausedAccumMs: Long = 0,
+    val pauseBeganAtMs: Long = 0, // 0 = not currently paused
+    val restEndAtMs: Long = 0,    // meaningful only while phase == REST
 ) {
     val current: SessionItem get() = items[idx]
 }
@@ -53,8 +66,19 @@ data class SessionState(
 fun initReps(reps: String): Int = reps.takeWhile { it.isDigit() }.toIntOrNull() ?: 10
 fun isTimeBased(reps: String): Boolean = reps.endsWith("s")
 
+private fun elapsedSec(s: SessionState, now: Long): Int =
+    ((now - s.workStartedAtMs - s.pausedAccumMs) / 1000).toInt().coerceAtLeast(0)
+
+private fun restLeftSec(s: SessionState, now: Long): Int =
+    ((s.restEndAtMs - now) / 1000).toInt()
+
 /** Build the initial state. preBest maps exerciseId -> (bestWeight, bestReps). */
-fun startSession(items: List<SessionItem>, restDefault: Int, preBest: Map<String, Pair<Double, Int>>): SessionState {
+fun startSession(
+    items: List<SessionItem>,
+    restDefault: Int,
+    preBest: Map<String, Pair<Double, Int>>,
+    now: Long = System.currentTimeMillis(),
+): SessionState {
     val first = items.first()
     return SessionState(
         items = items,
@@ -63,23 +87,28 @@ fun startSession(items: List<SessionItem>, restDefault: Int, preBest: Map<String
         preBest = preBest,
         curW = first.suggestW,
         curR = initReps(first.reps),
+        workStartedAtMs = now,
     )
 }
 
-/** 1-second tick: advances elapsed and counts down rest. */
-fun tick(s: SessionState): SessionState {
+/**
+ * Recompute elapsed/restLeft from the wall clock. Called both by the periodic 1s ticker and once
+ * immediately after restoring a persisted session, so a gap of any length (a throttled ticker, or
+ * the app having been closed) self-corrects instead of resuming from a stale counted value.
+ */
+fun tick(s: SessionState, now: Long = System.currentTimeMillis()): SessionState {
     if (s.paused || s.phase == Phase.DONE) return s
     return if (s.phase == Phase.REST) {
-        val rl = s.restLeft - 1
-        if (rl <= 0) advanceFromRest(s, fromTick = true)
-        else s.copy(restLeft = rl, elapsed = s.elapsed + 1)
+        val rl = restLeftSec(s, now)
+        if (rl <= 0) advanceFromRest(s, fromTick = true, now = now)
+        else s.copy(restLeft = rl, elapsed = elapsedSec(s, now))
     } else {
-        s.copy(elapsed = s.elapsed + 1)
+        s.copy(elapsed = elapsedSec(s, now))
     }
 }
 
 /** Rest finished (or skipped): advance to the next set/exercise and re-enter work. */
-fun advanceFromRest(s: SessionState, fromTick: Boolean): SessionState {
+fun advanceFromRest(s: SessionState, fromTick: Boolean, now: Long = System.currentTimeMillis()): SessionState {
     val it = s.items[s.idx]
     var idx = s.idx
     var setNum = s.setNum
@@ -96,14 +125,14 @@ fun advanceFromRest(s: SessionState, fromTick: Boolean): SessionState {
     }
     return s.copy(
         idx = idx, setNum = setNum, curW = curW, curR = curR,
-        phase = Phase.WORK, restLeft = 0, elapsed = if (fromTick) s.elapsed + 1 else s.elapsed,
+        phase = Phase.WORK, restLeft = 0, elapsed = elapsedSec(s, now),
     )
 }
 
 /** Log the current set, detect PRs, then move to rest (or finish). Returns state + whether a PR hit. */
 data class DoneResult(val state: SessionState, val pr: Boolean)
 
-fun doneSet(s: SessionState, units: String): DoneResult {
+fun doneSet(s: SessionState, units: String, now: Long = System.currentTimeMillis()): DoneResult {
     val it = s.items[s.idx]
     val w = s.curW; val reps = s.curR
     val log = s.log + LoggedSetFull(it.id, it.name, w, reps)
@@ -123,10 +152,15 @@ fun doneSet(s: SessionState, units: String): DoneResult {
     } else s.newPRs
     val lastSet = s.setNum >= it.sets
     val lastEx = s.idx >= s.items.size - 1
+    val elapsed = elapsedSec(s, now)
     val next = if (lastSet && lastEx) {
-        s.copy(log = log, completedSets = completedSets, volume = volume, preBest = preBest, newPRs = newPRs, phase = Phase.DONE)
+        s.copy(log = log, completedSets = completedSets, volume = volume, preBest = preBest, newPRs = newPRs, phase = Phase.DONE, elapsed = elapsed)
     } else {
-        s.copy(log = log, completedSets = completedSets, volume = volume, preBest = preBest, newPRs = newPRs, phase = Phase.REST, restLeft = s.restTotal)
+        val restEnd = now + s.restTotal * 1000L
+        s.copy(
+            log = log, completedSets = completedSets, volume = volume, preBest = preBest, newPRs = newPRs,
+            phase = Phase.REST, restLeft = s.restTotal, restEndAtMs = restEnd, elapsed = elapsed,
+        )
     }
     return DoneResult(next, pr)
 }
@@ -142,8 +176,39 @@ fun adjustR(s: SessionState, dir: Int): SessionState {
     return s.copy(curR = (s.curR + dir * step).coerceAtLeast(1))
 }
 
-fun addRest(s: SessionState, delta: Int): SessionState =
-    if (s.phase == Phase.REST) s.copy(restLeft = (s.restLeft + delta).coerceAtLeast(5)) else s
+/** +/- to the rest countdown while resting; floor of 5s left, mirrored in both the anchor and the display field. */
+fun addRest(s: SessionState, delta: Int, now: Long = System.currentTimeMillis()): SessionState {
+    if (s.phase != Phase.REST) return s
+    val minEnd = now + 5_000L
+    val newEnd = (s.restEndAtMs + delta * 1000L).coerceAtLeast(minEnd)
+    return s.copy(restEndAtMs = newEnd, restLeft = ((newEnd - now) / 1000).toInt())
+}
+
+/**
+ * Pause/resume. Pausing freezes elapsed (by accumulating the paused span into [SessionState.pausedAccumMs]
+ * once resumed) and, if resting, shifts [SessionState.restEndAtMs] forward by the paused span so the rest
+ * countdown doesn't lose time while paused — matching the pre-existing behavior where tick() was simply a
+ * no-op while paused, just now robust to the app being backgrounded mid-pause.
+ *
+ * [pauseSession] and [resumeSession] are exposed separately (not just as a toggle) because some
+ * callers need to unconditionally pause — e.g. holding the rest timer when auto-start-rest is off —
+ * without caring or asserting what the current paused state already was.
+ */
+fun pauseSession(s: SessionState, now: Long = System.currentTimeMillis()): SessionState =
+    if (s.paused) s else s.copy(paused = true, pauseBeganAtMs = now)
+
+fun resumeSession(s: SessionState, now: Long = System.currentTimeMillis()): SessionState {
+    if (!s.paused) return s
+    val pausedSpan = if (s.pauseBeganAtMs > 0) (now - s.pauseBeganAtMs).coerceAtLeast(0) else 0L
+    val newRestEnd = if (s.phase == Phase.REST) s.restEndAtMs + pausedSpan else s.restEndAtMs
+    return s.copy(
+        paused = false, pauseBeganAtMs = 0, pausedAccumMs = s.pausedAccumMs + pausedSpan,
+        restEndAtMs = newRestEnd,
+    )
+}
+
+fun togglePause(s: SessionState, now: Long = System.currentTimeMillis()): SessionState =
+    if (!s.paused) pauseSession(s, now) else resumeSession(s, now)
 
 /** Live PR-pace indicator for the current set. */
 fun prPace(s: SessionState): Boolean {

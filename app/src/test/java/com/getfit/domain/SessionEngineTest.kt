@@ -71,12 +71,62 @@ class SessionEngineTest {
     }
 
     @Test fun add_rest_clamps_to_five() {
-        val resting = start().copy(phase = Phase.REST, restLeft = 10)
-        assertThat(addRest(resting, -15).restLeft).isEqualTo(5)
+        val now = 1_000_000L
+        val resting = start().copy(phase = Phase.REST, restEndAtMs = now + 10_000, restLeft = 10)
+        assertThat(addRest(resting, -15, now).restLeft).isEqualTo(5)
     }
 
     @Test fun tick_counts_down_rest() {
-        val resting = start().copy(phase = Phase.REST, restLeft = 5)
-        assertThat(tick(resting).restLeft).isEqualTo(4)
+        val now = 1_000_000L
+        val resting = start().copy(phase = Phase.REST, restEndAtMs = now + 5_000, restLeft = 5)
+        assertThat(tick(resting, now + 1_000).restLeft).isEqualTo(4)
+    }
+
+    // --- wall-clock anchoring: the point of this file's timing rework ---
+
+    @Test fun tick_self_corrects_after_a_missed_interval() {
+        // Simulates the 1s ticker having been throttled (Doze, backgrounded coroutine, a
+        // process restart) for 12 real seconds instead of firing every second: restLeft should
+        // drop by the true elapsed time, not by 1.
+        val now = 1_000_000L
+        val resting = start().copy(phase = Phase.REST, restEndAtMs = now + 30_000, restLeft = 30)
+        assertThat(tick(resting, now + 12_000).restLeft).isEqualTo(18)
+    }
+
+    @Test fun tick_ends_rest_when_the_anchor_has_already_elapsed() {
+        // If the app was backgrounded for longer than the remaining rest, the very next tick
+        // should advance straight out of REST rather than reporting a negative restLeft.
+        val now = 1_000_000L
+        val resting = start().copy(phase = Phase.REST, restEndAtMs = now + 10_000, restLeft = 10, setNum = 1)
+        val r = tick(resting, now + 25_000)
+        assertThat(r.phase).isEqualTo(Phase.WORK)
+        assertThat(r.setNum).isEqualTo(2)
+    }
+
+    @Test fun elapsed_derives_from_wall_clock_and_pause_freezes_it() {
+        val now = 1_000_000L
+        var s = startSession(items(), restDefault = 60, preBest = emptyMap(), now = now)
+        s = tick(s, now + 10_000)
+        assertThat(s.elapsed).isEqualTo(10)
+
+        s = togglePause(s, now + 10_000)
+        s = tick(s, now + 40_000) // ticking while paused is a no-op
+        assertThat(s.elapsed).isEqualTo(10)
+
+        s = togglePause(s, now + 40_000) // resume 30s after pausing
+        s = tick(s, now + 45_000)
+        assertThat(s.elapsed).isEqualTo(15) // 10s before pause + 5s after resume; the 30s paused span is excluded
+    }
+
+    @Test fun pause_freezes_rest_countdown_across_a_background_gap() {
+        val now = 1_000_000L
+        var s = start().copy(phase = Phase.REST, restEndAtMs = now + 30_000, restLeft = 30)
+        s = togglePause(s, now)
+        s = tick(s, now + 20_000) // no-op while paused
+        assertThat(s.restLeft).isEqualTo(30)
+
+        s = togglePause(s, now + 20_000) // resume 20s later -> restEndAtMs shifts forward by the paused span
+        s = tick(s, now + 20_000)
+        assertThat(s.restLeft).isEqualTo(30)
     }
 }

@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,9 +43,9 @@ fun Stepper(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        StepIcon(Icons.Filled.RemoveCircle, iconSize, tint, onDec)
+        StepIcon(ForgeIcons.RemoveCircle, iconSize, tint, onDec)
         content()
-        StepIcon(Icons.Filled.AddCircle, iconSize, tint, onInc)
+        StepIcon(ForgeIcons.AddCircle, iconSize, tint, onInc)
     }
 }
 

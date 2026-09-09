@@ -11,12 +11,17 @@ import com.getfit.data.db.TargetDao
 import com.getfit.data.db.TargetEntity
 import com.getfit.data.prefs.PlanItemData
 import com.getfit.data.prefs.PlanStore
+import com.getfit.data.sync.SyncRepo
+import com.getfit.data.sync.SyncSessionSnapshot
+import com.getfit.data.sync.SyncTargetSnapshot
 import com.getfit.domain.Best
 import com.getfit.domain.LoggedSet
 import com.getfit.domain.bestFor
 import com.getfit.domain.isBW
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 /** Library + logged-set access, with best/PR derivation. */
 class ExerciseRepo(
@@ -47,7 +52,9 @@ class WorkoutRepo(
     private val exerciseDao: ExerciseDao,
     private val logDao: LogDao,
     private val sessionDao: SessionDao,
+    private val syncRepo: SyncRepo,
 ) {
+    private val syncJson = Json { ignoreUnknownKeys = true }
     val plan: Flow<List<PlanItemData>> = planStore.flow
 
     /** Returns false if already present. */
@@ -91,6 +98,10 @@ class WorkoutRepo(
         )
         sessionDao.insertSets(sets.map { SessionSetEntity(0, id, it.exerciseId, it.name, it.weight, it.reps) })
         logDao.insertAll(sets.map { SetLogEntity(0, it.exerciseId, it.weight, it.reps, now) })
+        syncRepo.enqueue(
+            "session", id, "upsert",
+            syncJson.encodeToString(SyncSessionSnapshot(id, now, name, durationSec, sets.size, volume, prs)),
+        )
     }
 
     private suspend fun currentPlan(): List<PlanItemData> = planStore.flow.first()
@@ -102,10 +113,23 @@ data class SessionSaveSet(val exerciseId: String, val name: String, val weight: 
 class ProgressRepo(
     private val sessionDao: SessionDao,
     private val targetDao: TargetDao,
+    private val syncRepo: SyncRepo,
 ) {
+    private val syncJson = Json { ignoreUnknownKeys = true }
+
     val sessions: Flow<List<SessionEntity>> = sessionDao.observeAll()
     val targets: Flow<List<TargetEntity>> = targetDao.observeAll()
 
-    suspend fun addTarget(t: TargetEntity) = targetDao.insert(t)
-    suspend fun deleteTarget(id: String) = targetDao.delete(id)
+    suspend fun addTarget(t: TargetEntity) {
+        targetDao.insert(t)
+        syncRepo.enqueue(
+            "target", t.id, "upsert",
+            syncJson.encodeToString(SyncTargetSnapshot(t.id, t.exId, t.target, t.start, t.startDMs, t.weeks)),
+        )
+    }
+
+    suspend fun deleteTarget(id: String) {
+        targetDao.delete(id)
+        syncRepo.enqueue("target", id, "delete", "")
+    }
 }

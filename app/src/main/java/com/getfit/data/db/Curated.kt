@@ -142,7 +142,7 @@ object Curated {
         OnboardSlide("exercise", 0xFFCBF25C, 0x59CBF25C, "1,324 exercises, fully detailed",
             "Browse a huge library with step-by-step cues and filters for every muscle and piece of kit."),
         OnboardSlide("monitoring", 0xFFF3B24A, 0x4CF3B24A, "Log every set, chase every PR",
-            "Track weight and reps as you train. GetFit spots personal records the moment you hit them."),
+            "Track weight and reps as you train. Forge spots personal records the moment you hit them."),
         OnboardSlide("flag", 0xFF86D6B4, 0x4C86D6B4, "Set targets, watch them close",
             "Pick a goal weight and a deadline, then follow your progress. Everything stays private, on your device."),
     )

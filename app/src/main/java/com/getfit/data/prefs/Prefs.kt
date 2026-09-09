@@ -25,6 +25,9 @@ data class Settings(
     val intensity: String = "Moderate",
     val onboarded: Boolean = false,
     val seeded: Boolean = false,
+    // AI review: the API key itself lives in SecureKeyStore (encrypted), not here — this is just
+    // which model to call, a non-secret preference like any other.
+    val aiModel: String = "claude-sonnet-4-5",
 )
 
 private object Keys {
@@ -36,6 +39,7 @@ private object Keys {
     val INTENSITY = stringPreferencesKey("intensity")
     val ONBOARDED = booleanPreferencesKey("onboarded")
     val SEEDED = booleanPreferencesKey("seeded")
+    val AI_MODEL = stringPreferencesKey("aiModel")
     val PLAN = stringPreferencesKey("plan")
     val SESSION = stringPreferencesKey("session")
 }
@@ -51,6 +55,7 @@ class SettingsStore(private val ds: DataStore<Preferences>) {
             intensity = p[Keys.INTENSITY] ?: "Moderate",
             onboarded = p[Keys.ONBOARDED] ?: false,
             seeded = p[Keys.SEEDED] ?: false,
+            aiModel = p[Keys.AI_MODEL] ?: "claude-sonnet-4-5",
         )
     }
 
@@ -62,12 +67,14 @@ class SettingsStore(private val ds: DataStore<Preferences>) {
     suspend fun setIntensity(v: String) = ds.edit { it[Keys.INTENSITY] = v; it[Keys.REST_DEFAULT] = Curated.INTENSITY[v]?.rest ?: 60 }
     suspend fun setOnboarded(v: Boolean) = ds.edit { it[Keys.ONBOARDED] = v }
     suspend fun setSeeded(v: Boolean) = ds.edit { it[Keys.SEEDED] = v }
+    suspend fun setAiModel(v: String) = ds.edit { it[Keys.AI_MODEL] = v }
 
     /** Reset preferences to defaults (proto clearAll). */
     suspend fun resetToDefaults() = ds.edit {
         it[Keys.UNITS] = "kg"; it[Keys.SOUND] = true; it[Keys.HAPTICS] = true
         it[Keys.AUTOREST] = true; it[Keys.REST_DEFAULT] = 60; it[Keys.INTENSITY] = "Moderate"
-        // onboarded + seeded are intentionally preserved.
+        // onboarded + seeded are intentionally preserved. The AI key (SecureKeyStore) and model
+        // choice are left untouched too — "clear all data" means workout data, not app config.
     }
 }
 

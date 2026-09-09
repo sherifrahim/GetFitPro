@@ -28,6 +28,7 @@ data class NavState(
     val detailId: String? = null,
     val settingsOpen: Boolean = false,
     val goalOpen: Boolean = false,
+    val aiReviewOpen: Boolean = false,
     val booted: Boolean = false,
     val charted: Boolean = false,
     val confirmClear: Boolean = false,
@@ -39,6 +40,27 @@ data class NavState(
 )
 
 data class ToastMsg(val text: String, val icon: String)
+
+/** State for the AI review overlay: idle (nothing requested yet), loading, a result, or an error. */
+data class AiReviewUiState(
+    val loading: Boolean = false,
+    val text: String? = null,
+    val error: String? = null,
+)
+
+/** State for the Settings "Import & export" section. */
+data class ImportExportUiState(
+    val busy: Boolean = false,
+    val lastResult: String? = null,
+    val lastError: String? = null,
+)
+
+/** State for the Settings "Cloud sync" section: the persisted sync state plus a transient
+ *  in-progress flag that isn't itself persisted. */
+data class SyncUiState(
+    val state: com.getfit.data.sync.SyncState = com.getfit.data.sync.SyncState(),
+    val busy: Boolean = false,
+)
 
 const val TAB_HOME = "home"
 const val TAB_EXERCISES = "exercises"

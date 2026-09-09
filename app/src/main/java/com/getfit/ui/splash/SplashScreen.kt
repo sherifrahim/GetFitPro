@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +25,7 @@ import com.getfit.core.anim.GfSpring
 import com.getfit.core.theme.GfColor
 import com.getfit.core.theme.Manrope
 import com.getfit.core.theme.SpaceGrotesk
+import com.getfit.core.ui.LogoMark
 
 @Composable
 fun SplashScreen() {
@@ -42,10 +40,10 @@ fun SplashScreen() {
                 Modifier.size(96.dp).scale(scale.value).clip(RoundedCornerShape(28.dp)).background(GfColor.Lime),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Bolt, contentDescription = null, tint = GfColor.OnAccent, modifier = Modifier.size(54.dp))
+                LogoMark(color = GfColor.OnAccent, modifier = Modifier.size(50.dp))
             }
             Text(
-                "GetFit", color = GfColor.Text, fontFamily = SpaceGrotesk,
+                "Forge", color = GfColor.Text, fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.W700, fontSize = 30.sp,
                 modifier = Modifier.padding(top = 20.dp), textAlign = TextAlign.Center,
             )

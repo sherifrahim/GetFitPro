@@ -17,11 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DashboardCustomize
-import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.getfit.core.anim.GfSpring
 import com.getfit.core.theme.GfColor
 import com.getfit.core.theme.Manrope
+import com.getfit.core.ui.ForgeIcons
 import com.getfit.ui.TAB_BUILD
 import com.getfit.ui.TAB_EXERCISES
 import com.getfit.ui.TAB_HOME
@@ -45,10 +41,10 @@ import com.getfit.ui.TAB_PROGRESS
 private data class TabDef(val key: String, val icon: ImageVector, val label: String)
 
 private val TABS = listOf(
-    TabDef(TAB_HOME, Icons.Filled.Home, "Home"),
-    TabDef(TAB_EXERCISES, Icons.Filled.FitnessCenter, "Exercises"),
-    TabDef(TAB_BUILD, Icons.Filled.DashboardCustomize, "Build"),
-    TabDef(TAB_PROGRESS, Icons.Filled.BarChart, "Progress"),
+    TabDef(TAB_HOME, ForgeIcons.Home, "Home"),
+    TabDef(TAB_EXERCISES, ForgeIcons.FitnessCenter, "Exercises"),
+    TabDef(TAB_BUILD, ForgeIcons.DashboardCustomize, "Build"),
+    TabDef(TAB_PROGRESS, ForgeIcons.Monitoring, "Progress"),
 )
 
 @Composable

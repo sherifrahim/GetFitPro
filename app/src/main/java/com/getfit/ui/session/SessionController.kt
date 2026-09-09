@@ -15,8 +15,10 @@ import com.getfit.domain.advanceFromRest
 import com.getfit.domain.bestFor
 import com.getfit.domain.doneSet
 import com.getfit.domain.isBW
+import com.getfit.domain.pauseSession
 import com.getfit.domain.startSession
 import com.getfit.domain.tick
+import com.getfit.domain.togglePause
 import com.getfit.data.repo.SessionSaveSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -32,6 +34,11 @@ import kotlinx.coroutines.launch
 /**
  * Drives the pure SessionEngine: builds session items from the plan, runs a 1s ticker, applies
  * user actions and persists the completed session. UI reads [state] (nullable = no active session).
+ *
+ * Timing is wall-clock anchored (see SessionEngine.kt doc): the ticker's job is just to trigger a
+ * UI recomposition every second, not to BE the clock. Every call into the engine passes the real
+ * `now`, so a throttled ticker (screen off, Doze) or a process restart mid-session self-corrects on
+ * the very next tick instead of drifting or resuming from a stale counted value.
  */
 class SessionController(
     private val container: AppContainer,
@@ -47,11 +54,14 @@ class SessionController(
 
     init {
         scope.launch { container.settingsStore.flow.collect { units = it.units; autorest = it.autorest } }
-        // Restore an in-progress session after process death.
+        // Restore an in-progress session after process death, resyncing its clock immediately
+        // (rather than waiting for the next tick) so a long gap since the last persist — the app
+        // having been closed, not just backgrounded — is reflected right away.
         scope.launch {
             val saved = container.sessionStore.load()
             if (saved != null) {
-                _state.value = saved
+                val now = System.currentTimeMillis()
+                _state.value = if (saved.phase != Phase.DONE) tick(saved, now) else saved
                 if (saved.phase != Phase.DONE) startTicker()
             }
         }
@@ -85,7 +95,7 @@ class SessionController(
                 val b = bestFor(ls, si.bw)
                 si.id to ((b?.let { Units.toDisplay(it.weight, u) } ?: 0.0) to (b?.reps ?: 0))
             }
-            _state.value = startSession(sessItems, settings.restDefault, preBest)
+            _state.value = startSession(sessItems, settings.restDefault, preBest, System.currentTimeMillis())
             startTicker()
             persist()
         }
@@ -98,7 +108,7 @@ class SessionController(
                 delay(1000)
                 val s = _state.value ?: break
                 if (s.phase == Phase.DONE) break
-                _state.update { it?.let(::tick) }
+                _state.update { it?.let { cur -> tick(cur, System.currentTimeMillis()) } }
             }
         }
     }
@@ -106,17 +116,27 @@ class SessionController(
     fun doneSet() {
         _state.update { s ->
             s ?: return@update null
-            val r = doneSet(s, units)
+            val r = doneSet(s, units, System.currentTimeMillis())
             if (r.pr) toast("New personal record!", "local_fire_department")
             // If auto-start-rest is off, hold the rest timer paused until the user starts/skips it.
-            if (r.state.phase == Phase.REST && !autorest) r.state.copy(paused = true) else r.state
+            if (r.state.phase == Phase.REST && !autorest) pauseSession(r.state, System.currentTimeMillis()) else r.state
         }
         persist()
     }
 
-    fun skip() { _state.update { s -> if (s?.phase == Phase.REST) advanceFromRest(s, false) else s }; persist() }
-    fun addRest(delta: Int) { _state.update { it?.let { s -> addRest(s, delta) } }; persist() }
-    fun togglePause() { _state.update { it?.copy(paused = !it.paused) }; persist() }
+    fun skip() {
+        _state.update { s -> if (s?.phase == Phase.REST) advanceFromRest(s, false, System.currentTimeMillis()) else s }
+        persist()
+    }
+    fun addRest(delta: Int) {
+        val now = System.currentTimeMillis()
+        _state.update { it?.let { s -> addRest(s, delta, now) } }
+        persist()
+    }
+    fun togglePause() {
+        _state.update { it?.let { s -> togglePause(s, System.currentTimeMillis()) } }
+        persist()
+    }
     fun incW() { _state.update { it?.let { s -> adjustW(s, 1, units) } }; persist() }
     fun decW() { _state.update { it?.let { s -> adjustW(s, -1, units) } }; persist() }
     fun incR() { _state.update { it?.let { s -> adjustR(s, 1) } }; persist() }

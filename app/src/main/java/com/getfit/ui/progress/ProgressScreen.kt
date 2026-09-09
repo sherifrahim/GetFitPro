@@ -149,6 +149,22 @@ fun ProgressScreen(vm: AppViewModel) {
             }
         }
 
+        // AI review entry point
+        Row(
+            Modifier.padding(top = 18.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.AccentGradient)
+                .clickable(remember { MutableInteractionSource() }, indication = null) { vm.openAiReview() }.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color(0x24171210)), contentAlignment = Alignment.Center) {
+                Icon(msIcon("smart_display"), null, tint = GfColor.OnAccent, modifier = Modifier.size(22.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text("AI review", color = GfColor.OnAccent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
+                Text("Get a coach's read on your recent training", color = GfColor.OnAccentSub, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+            Icon(msIcon("chevron_right"), null, tint = GfColor.OnAccentSub, modifier = Modifier.size(20.dp))
+        }
+
         // personal records
         Row(Modifier.fillMaxWidth().padding(top = 26.dp, bottom = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Personal records", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)

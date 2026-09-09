@@ -1,9 +1,15 @@
 package com.getfit.ui
 
+import android.content.ContentResolver
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.getfit.data.ai.AiReviewClient
+import com.getfit.data.ai.AiReviewResult
+import com.getfit.data.ai.buildWorkoutSummary
 import com.getfit.data.db.Curated
 import com.getfit.data.db.TargetEntity
+import com.getfit.data.importexport.ImportOutcome
 import com.getfit.data.prefs.PlanItemData
 import com.getfit.data.prefs.Settings
 import com.getfit.di.AppContainer
@@ -12,6 +18,7 @@ import com.getfit.domain.LoggedSet
 import com.getfit.domain.Units
 import com.getfit.domain.bestFor
 import com.getfit.domain.isBW
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +29,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AppViewModel(private val container: AppContainer) : ViewModel() {
 
@@ -29,6 +37,8 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     private val workoutRepo = container.workoutRepo
     private val progressRepo = container.progressRepo
     private val settingsStore = container.settingsStore
+    private val importExportRepo = container.importExportRepo
+    private val syncRepo = container.syncRepo
 
     val data: StateFlow<AppData> = combine(
         exerciseRepo.exercises, exerciseRepo.logs, progressRepo.sessions,
@@ -48,8 +58,21 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     val settings: StateFlow<Settings> =
         settingsStore.flow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), Settings())
 
+    val hasAiKey: StateFlow<Boolean> =
+        container.secureKeyStore.hasKey.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     private val _nav = MutableStateFlow(NavState())
     val nav: StateFlow<NavState> = _nav.asStateFlow()
+
+    private val _aiReview = MutableStateFlow(AiReviewUiState())
+    val aiReview: StateFlow<AiReviewUiState> = _aiReview.asStateFlow()
+
+    private val _importExport = MutableStateFlow(ImportExportUiState())
+    val importExport: StateFlow<ImportExportUiState> = _importExport.asStateFlow()
+
+    private val _syncBusy = MutableStateFlow(false)
+    val syncUi: StateFlow<SyncUiState> = combine(syncRepo.state, _syncBusy) { s, busy -> SyncUiState(s, busy) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SyncUiState())
 
     private var toastJob: Job? = null
     private var clearJob: Job? = null
@@ -170,6 +193,92 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun startSession(items: List<PlanItemData>) { sessionController.start(items) }
     fun startSingle(id: String, reps: String) { sessionController.start(listOf(PlanItemData(id, 3, reps))) }
     fun endSession() = viewModelScope.launch { sessionController.endAndSave(); selectTab(TAB_PROGRESS) }
+
+    // ---- AI review ----
+    fun openAiReview() = _nav.update { it.copy(aiReviewOpen = true) }
+    fun closeAiReview() = _nav.update { it.copy(aiReviewOpen = false) }
+
+    fun setAiApiKey(key: String) = viewModelScope.launch { container.secureKeyStore.setApiKey(key) }
+    fun clearAiApiKey() = viewModelScope.launch { container.secureKeyStore.clear() }
+    fun setAiModel(v: String) = viewModelScope.launch { settingsStore.setAiModel(v) }
+
+    fun runAiReview() {
+        if (_aiReview.value.loading) return
+        _aiReview.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            val apiKey = container.secureKeyStore.getApiKey()
+            if (apiKey.isNullOrBlank()) {
+                _aiReview.update { it.copy(loading = false, error = "Add your API key in Settings first.") }
+                return@launch
+            }
+            val d = data.value
+            val summary = buildWorkoutSummary(d.sessions, d.targets, d.bestMap, d.exercises, settings.value.units)
+            when (val result = AiReviewClient.review(apiKey, settings.value.aiModel, summary)) {
+                is AiReviewResult.Success -> _aiReview.update { it.copy(loading = false, text = result.text, error = null) }
+                is AiReviewResult.Failure -> _aiReview.update { it.copy(loading = false, error = result.message) }
+            }
+        }
+    }
+
+    // ---- import / export ----
+    fun importCsv(resolver: ContentResolver, uri: Uri) {
+        if (_importExport.value.busy) return
+        _importExport.update { it.copy(busy = true, lastError = null, lastResult = null) }
+        viewModelScope.launch {
+            val text = try {
+                withContext(Dispatchers.IO) {
+                    resolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                }
+            } catch (e: Exception) { null }
+
+            if (text.isNullOrBlank()) {
+                _importExport.update { it.copy(busy = false, lastError = "Couldn't read that file.") }
+                return@launch
+            }
+            when (val outcome = importExportRepo.importCsv(text, data.value.exercises)) {
+                is ImportOutcome.Success -> {
+                    val s = outcome.summary
+                    val msg = buildString {
+                        append("Imported ${s.setsImported} sets across ${s.sessionsImported} sessions from ${s.format.label}")
+                        if (s.exercisesCreated > 0) append(" — added ${s.exercisesCreated} new exercises")
+                        if (s.skippedRows > 0) append(" (skipped ${s.skippedRows} unrecognized rows)")
+                    }
+                    _importExport.update { it.copy(busy = false, lastResult = msg, lastError = null) }
+                    toast("Import complete", "check_circle")
+                }
+                is ImportOutcome.Failure -> _importExport.update { it.copy(busy = false, lastError = outcome.message) }
+            }
+        }
+    }
+
+    fun exportCsv(resolver: ContentResolver, uri: Uri) {
+        if (_importExport.value.busy) return
+        _importExport.update { it.copy(busy = true, lastError = null, lastResult = null) }
+        viewModelScope.launch {
+            try {
+                val csv = importExportRepo.exportCsv()
+                withContext(Dispatchers.IO) {
+                    resolver.openOutputStream(uri)?.use { it.write(csv.toByteArray()) }
+                }
+                _importExport.update { it.copy(busy = false, lastResult = "Export saved.") }
+                toast("Exported", "check_circle")
+            } catch (e: Exception) {
+                _importExport.update { it.copy(busy = false, lastError = "Couldn't write that file.") }
+            }
+        }
+    }
+
+    // ---- cloud sync (client-side groundwork; inert until a server URL is set) ----
+    fun setSyncServerUrl(url: String) = viewModelScope.launch { syncRepo.setServerUrl(url) }
+
+    fun syncNow() {
+        if (_syncBusy.value) return
+        _syncBusy.value = true
+        viewModelScope.launch {
+            syncRepo.syncNow()
+            _syncBusy.value = false
+        }
+    }
 
     // ---- toast ----
     fun toast(text: String, icon: String = "check_circle") {
