@@ -115,16 +115,28 @@ class SessionController(
                 delay(1000)
                 val s = _state.value ?: break
                 if (s.phase == Phase.DONE) break
-                val next = tick(s, System.currentTimeMillis())
+                // Stays an atomic update rather than a read-compute-write: skip()/addRest()/
+                // doneSet()/togglePause() all mutate _state from the main thread while this ticker
+                // runs, and a plain `_state.value = next` would silently clobber a tap that landed
+                // after this iteration read the state. `update` re-runs its lambda on contention,
+                // so restJustEnded always reflects the attempt that actually won.
+                var restJustEnded = false
+                _state.update { cur ->
+                    if (cur == null) return@update null
+                    val next = tick(cur, System.currentTimeMillis())
+                    restJustEnded = cur.phase == Phase.REST && next.phase == Phase.WORK
+                    next
+                }
                 // Rest ending here means it expired naturally (not a user tap on Skip/±15, which
                 // already have their own tap-driven feedback in SessionScreen.kt) — the one point in
                 // the flow with no Compose click handler to hang a cue off, so it's fired here
                 // instead. advanceFromRest always lands on WORK, never DONE, so this check alone is
                 // exhaustive for "rest just ended" whether that's the next set or the next exercise.
-                if (s.phase == Phase.REST && next.phase == Phase.WORK) {
+                // Fired after the state write, never before: ToneGenerator construction can block
+                // for tens of ms, and holding the write behind it is what created the race above.
+                if (restJustEnded) {
                     SessionFeedback.restEnded(container.appContext, soundOn, hapticsOn)
                 }
-                _state.value = next
             }
         }
     }
