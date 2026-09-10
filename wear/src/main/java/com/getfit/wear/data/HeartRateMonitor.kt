@@ -13,8 +13,9 @@ import androidx.health.services.client.data.ExerciseUpdate
 /**
  * Live heart rate during an active session, via Health Services' ExerciseClient
  * (ExerciseType.STRENGTH_TRAINING — no GPS needed, unlike a run/ride exercise type). Requires the
- * BODY_SENSORS runtime permission (declared in the manifest; requesting it at runtime is still
- * needed from the UI layer, not yet wired here).
+ * BODY_SENSORS runtime permission: declared in the wear manifest and requested from the UI layer in
+ * MainActivity.kt, which is the right place for it (an Activity is needed to launch the request).
+ * [start] assumes the grant already happened — without it startExerciseAsync reports no HR data.
  */
 class HeartRateMonitor(context: Context) {
     private val exerciseClient = HealthServices.getClient(context).exerciseClient
