@@ -1,5 +1,6 @@
 package com.getfit.data.importexport
 
+import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -23,28 +24,56 @@ data class ParsedSetRow(
 
 data class ParsedImport(val format: SourceFormat, val rows: List<ParsedSetRow>, val skippedRows: Int)
 
+/**
+ * Offset-bearing forms come first, and are the reason [parseFlexibleDate] insists on consuming the
+ * whole string on its first pass: `SimpleDateFormat.parse` happily matches a prefix and discards
+ * whatever trails it, so "yyyy-MM-dd'T'HH:mm:ss" would swallow "2024-03-02T10:30:00Z" and drop the
+ * Z — reading a UTC timestamp as local time. That silently shifts an imported workout by the
+ * device's offset, which can land it on the wrong calendar day, and day boundaries drive both the
+ * streak count and the weekly chart.
+ *
+ * `XXX` accepts a literal "Z" as well as "+02:00", so it covers both.
+ */
 private val DATE_PATTERNS = listOf(
-    "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss'Z'",
+    "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", "yyyy-MM-dd'T'HH:mm:ssXXX",
+    "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd'T'HH:mm:ss.SSS",
+    "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss",
     "yyyy-MM-dd HH:mm", "yyyy-MM-dd",
     "dd MMM yyyy, HH:mm", "dd MMM yyyy HH:mm", "dd MMM yyyy",
     "MMM dd, yyyy, h:mm a", "MMM dd, yyyy h:mm a", "MMM dd, yyyy",
     "MM/dd/yyyy HH:mm", "MM/dd/yyyy", "dd/MM/yyyy HH:mm", "dd/MM/yyyy",
 )
 
-/** Tries a battery of common export date formats; falls back to [fallback] (never crashes/rejects
- *  a whole file over one unparseable date). */
+/**
+ * Tries a battery of common export date formats; falls back to [fallback] (never crashes or rejects
+ * a whole file over one unparseable date).
+ *
+ * Two passes, deliberately. The first requires a pattern to consume the entire string, so a short
+ * pattern can't match a prefix and quietly throw away a timezone or a sub-second field. The second
+ * relaxes that and accepts a prefix match, which is how this used to behave — kept because for an
+ * import, a date that's slightly off still beats falling back to "now" and filing the whole workout
+ * under today.
+ */
 fun parseFlexibleDate(raw: String, fallback: Long): Long {
     val s = raw.trim()
     if (s.isEmpty()) return fallback
+    parseWith(s, requireFullMatch = true)?.let { return it }
+    parseWith(s, requireFullMatch = false)?.let { return it }
+    return fallback
+}
+
+private fun parseWith(s: String, requireFullMatch: Boolean): Long? {
     for (p in DATE_PATTERNS) {
         try {
             val fmt = SimpleDateFormat(p, Locale.US)
             fmt.isLenient = false
-            val parsed = fmt.parse(s) ?: continue
+            val pos = ParsePosition(0)
+            val parsed = fmt.parse(s, pos) ?: continue
+            if (requireFullMatch && pos.index != s.length) continue
             return parsed.time
         } catch (_: Exception) { /* try next pattern */ }
     }
-    return fallback
+    return null
 }
 
 private fun findCol(header: List<String>, vararg keywords: String): Int {
