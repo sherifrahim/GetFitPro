@@ -35,6 +35,10 @@ interface LogDao {
     @Query("SELECT * FROM set_logs ORDER BY dateMs ASC")
     fun observeAll(): Flow<List<SetLogEntity>>
 
+    /** One-shot read for backup/export, matching SessionDao.allOnce(). */
+    @Query("SELECT * FROM set_logs ORDER BY dateMs ASC")
+    suspend fun allOnce(): List<SetLogEntity>
+
     @Query("SELECT * FROM set_logs WHERE exerciseId = :id ORDER BY dateMs ASC")
     suspend fun forExercise(id: String): List<SetLogEntity>
 
@@ -79,6 +83,10 @@ interface TargetDao {
 
     @Query("SELECT * FROM targets")
     fun observeAll(): Flow<List<TargetEntity>>
+
+    /** One-shot read for backup/export, matching SessionDao.allOnce(). */
+    @Query("SELECT * FROM targets")
+    suspend fun allOnce(): List<TargetEntity>
 
     @Query("DELETE FROM targets WHERE id = :id")
     suspend fun delete(id: String)

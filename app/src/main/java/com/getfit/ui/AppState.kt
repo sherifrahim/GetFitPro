@@ -55,6 +55,19 @@ data class ImportExportUiState(
     val lastError: String? = null,
 )
 
+/**
+ * State for the Settings "Backup" section. [stored] is the on-device backup's metadata, or null
+ * when none has been made yet. [confirmingRestore] gates the restore behind a second tap, because
+ * restoring replaces the user's current history.
+ */
+data class BackupUiState(
+    val busy: Boolean = false,
+    val stored: com.getfit.data.backup.BackupInfo? = null,
+    val confirmingRestore: Boolean = false,
+    val lastResult: String? = null,
+    val lastError: String? = null,
+)
+
 /** State for the Settings "Cloud sync" section: the persisted sync state plus a transient
  *  in-progress flag that isn't itself persisted. */
 data class SyncUiState(

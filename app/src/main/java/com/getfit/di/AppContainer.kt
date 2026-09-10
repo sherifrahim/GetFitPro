@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.getfit.data.db.GetFitDatabase
+import com.getfit.data.backup.BackupRepo
 import com.getfit.data.db.Seeder
 import com.getfit.data.prefs.PlanStore
 import com.getfit.data.prefs.SettingsStore
@@ -45,6 +46,10 @@ class AppContainer(val appContext: Context) {
     val progressRepo = ProgressRepo(db.sessionDao(), db.targetDao(), syncRepo)
     val importExportRepo = ImportExportRepo(db.exerciseDao(), db.logDao(), db.sessionDao())
     val phoneWearSync = PhoneWearSync(appContext)
+    val backupRepo = BackupRepo(
+        db.exerciseDao(), db.logDao(), db.sessionDao(), db.targetDao(),
+        settingsStore, planStore, appContext.filesDir,
+    )
 
     /** Seed the library + demo data on first launch (idempotent). */
     fun seedOnFirstLaunch() {

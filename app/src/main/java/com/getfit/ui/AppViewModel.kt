@@ -9,6 +9,7 @@ import com.getfit.data.ai.AiReviewResult
 import com.getfit.data.ai.buildWorkoutSummary
 import com.getfit.data.db.Curated
 import com.getfit.data.db.TargetEntity
+import com.getfit.data.backup.RestoreOutcome
 import com.getfit.data.importexport.ImportOutcome
 import com.getfit.data.prefs.PlanItemData
 import com.getfit.data.prefs.Settings
@@ -41,6 +42,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     private val progressRepo = container.progressRepo
     private val settingsStore = container.settingsStore
     private val importExportRepo = container.importExportRepo
+    private val backupRepo = container.backupRepo
     private val syncRepo = container.syncRepo
 
     val data: StateFlow<AppData> = combine(
@@ -69,6 +71,9 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _aiReview = MutableStateFlow(AiReviewUiState())
     val aiReview: StateFlow<AiReviewUiState> = _aiReview.asStateFlow()
+
+    private val _backup = MutableStateFlow(BackupUiState())
+    val backup: StateFlow<BackupUiState> = _backup.asStateFlow()
 
     private val _importExport = MutableStateFlow(ImportExportUiState())
     val importExport: StateFlow<ImportExportUiState> = _importExport.asStateFlow()
@@ -300,6 +305,91 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             } catch (e: Exception) {
                 _importExport.update { it.copy(busy = false, lastError = "Couldn't write that file.") }
             }
+        }
+    }
+
+    // ---- on-device backup ----
+
+    /** Refreshes the stored-backup metadata shown in Settings. Cheap; safe to call on open. */
+    fun refreshBackupInfo() {
+        viewModelScope.launch {
+            val info = withContext(Dispatchers.IO) { backupRepo.localBackupInfo() }
+            _backup.update { it.copy(stored = info) }
+        }
+    }
+
+    fun backupToDevice() {
+        if (_backup.value.busy) return
+        _backup.update { it.copy(busy = true, lastError = null, lastResult = null) }
+        viewModelScope.launch {
+            backupRepo.backupToDevice().fold(
+                onSuccess = { info ->
+                    _backup.update {
+                        it.copy(busy = false, stored = info, lastResult = "Backed up ${info.records} records to this device.")
+                    }
+                    toast("Backed up", "check_circle")
+                },
+                onFailure = { e ->
+                    _backup.update { it.copy(busy = false, lastError = e.message ?: "Couldn't write the backup.") }
+                },
+            )
+        }
+    }
+
+    /** First tap arms the confirmation, second actually restores — same pattern as "Clear all data". */
+    fun askRestore() = _backup.update { it.copy(confirmingRestore = true, lastError = null, lastResult = null) }
+    fun cancelRestore() = _backup.update { it.copy(confirmingRestore = false) }
+
+    fun restoreFromDevice() {
+        if (_backup.value.busy) return
+        _backup.update { it.copy(busy = true, confirmingRestore = false, lastError = null, lastResult = null) }
+        viewModelScope.launch { applyRestore(backupRepo.restoreFromDevice()) }
+    }
+
+    /** Writes the same format the local slot uses, so a saved copy can be restored on any install. */
+    fun exportBackup(resolver: ContentResolver, uri: Uri) {
+        if (_backup.value.busy) return
+        _backup.update { it.copy(busy = true, lastError = null, lastResult = null) }
+        viewModelScope.launch {
+            try {
+                val text = backupRepo.exportText()
+                withContext(Dispatchers.IO) {
+                    resolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) }
+                        ?: error("Couldn't open that file for writing.")
+                }
+                _backup.update { it.copy(busy = false, lastResult = "Backup file saved.") }
+                toast("Saved", "check_circle")
+            } catch (e: Exception) {
+                _backup.update { it.copy(busy = false, lastError = "Couldn't write that file.") }
+            }
+        }
+    }
+
+    fun restoreFromFile(resolver: ContentResolver, uri: Uri) {
+        if (_backup.value.busy) return
+        _backup.update { it.copy(busy = true, confirmingRestore = false, lastError = null, lastResult = null) }
+        viewModelScope.launch {
+            val text = withContext(Dispatchers.IO) {
+                runCatching { resolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } }.getOrNull()
+            }
+            if (text == null) {
+                _backup.update { it.copy(busy = false, lastError = "Couldn't read that file.") }
+                return@launch
+            }
+            applyRestore(backupRepo.restoreFromText(text))
+        }
+    }
+
+    private fun applyRestore(outcome: RestoreOutcome) {
+        when (outcome) {
+            is RestoreOutcome.Success -> {
+                _backup.update {
+                    it.copy(busy = false, lastResult = "Restored ${outcome.info.records} records.", lastError = null)
+                }
+                toast("Restored", "check_circle")
+            }
+            is RestoreOutcome.Failure ->
+                _backup.update { it.copy(busy = false, lastError = outcome.message) }
         }
     }
 

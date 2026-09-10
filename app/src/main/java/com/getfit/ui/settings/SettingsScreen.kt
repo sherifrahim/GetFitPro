@@ -117,6 +117,9 @@ fun SettingsScreen(vm: AppViewModel) {
             SectionLabel("AI coach")
             AiKeySection(hasAiKey = hasAiKey, model = settings.aiModel, vm = vm)
 
+            SectionLabel("Backup")
+            BackupSection(vm)
+
             SectionLabel("Import & export")
             ImportExportSection(vm)
 
@@ -237,6 +240,151 @@ private fun AiKeySection(hasAiKey: Boolean, model: String, vm: AppViewModel) {
         }
     }
 }
+
+/**
+ * On-device backup. Separate from Import & export below on purpose: that moves *sets* between apps
+ * and is lossy, this puts the app back exactly as it was (targets, plan, settings and all).
+ */
+@Composable
+private fun BackupSection(vm: AppViewModel) {
+    val context = LocalContext.current
+    val state by vm.backup.collectAsState()
+
+    LaunchedEffect(Unit) { vm.refreshBackupInfo() }
+
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let { vm.exportBackup(context.contentResolver, it) }
+    }
+    val openLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { vm.restoreFromFile(context.contentResolver, it) }
+    }
+
+    val stored = state.stored
+    val storedLabel = stored?.let {
+        "Last backup ${relativeTime(it.createdAtMs)} · ${it.records} records"
+    } ?: "No backup on this device yet"
+
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.Surface)
+            .border(1.dp, GfColor.Hairline06, RoundedCornerShape(20.dp)),
+    ) {
+        Row(
+            Modifier.fillMaxWidth()
+                .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !state.busy) { vm.backupToDevice() }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(msIcon("check_circle"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Back up now", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.5.sp)
+                Text(storedLabel, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
+        Divider()
+
+        // Restore is gated behind a confirm tap — it replaces current history.
+        val confirming = state.confirmingRestore
+        Row(
+            Modifier.fillMaxWidth()
+                .background(if (confirming) Color(0x24F0774E) else Color.Transparent)
+                .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !state.busy && stored != null) {
+                    if (confirming) vm.restoreFromDevice() else vm.askRestore()
+                }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(
+                msIcon(if (confirming) "warning" else "keyboard_arrow_down"), null,
+                tint = when {
+                    confirming -> GfColor.Coral
+                    stored == null -> GfColor.TextFaint
+                    else -> GfColor.Accent
+                },
+                modifier = Modifier.size(22.dp),
+            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (confirming) "Tap again to replace your data" else "Restore from device",
+                    color = if (confirming) GfColor.Coral else if (stored == null) GfColor.TextFaint else GfColor.Text,
+                    fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.5.sp,
+                )
+                Text(
+                    if (confirming) {
+                        "Your current workouts, targets and plan are replaced by the backup."
+                    } else {
+                        "Puts back everything from the last backup on this device"
+                    },
+                    color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500,
+                    fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            if (confirming) {
+                Text(
+                    "Cancel",
+                    color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
+                    modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null) { vm.cancelRestore() },
+                )
+            }
+        }
+        Divider()
+        Row(
+            Modifier.fillMaxWidth()
+                .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !state.busy) {
+                    saveLauncher.launch("forge-backup-${fileStamp()}.json")
+                }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(msIcon("keyboard_arrow_up"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Save a copy off device", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.5.sp)
+                Text(
+                    "The on-device backup goes away if Forge is uninstalled — keep a copy elsewhere",
+                    color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500,
+                    fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            Icon(msIcon("chevron_right"), null, tint = GfColor.TextFaint, modifier = Modifier.size(20.dp))
+        }
+        Divider()
+        Row(
+            Modifier.fillMaxWidth()
+                .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !state.busy) { openLauncher.launch("*/*") }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(msIcon("exercise"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Restore from a file", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.5.sp)
+                Text("Pick a saved forge-backup .json", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+            Icon(msIcon("chevron_right"), null, tint = GfColor.TextFaint, modifier = Modifier.size(20.dp))
+        }
+
+        if (state.busy || state.lastResult != null || state.lastError != null) {
+            Divider()
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                when {
+                    state.busy -> {
+                        Icon(msIcon("monitoring"), null, tint = GfColor.TextFaint, modifier = Modifier.size(16.dp))
+                        Text("Working…", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp)
+                    }
+                    state.lastError != null -> {
+                        Icon(msIcon("warning"), null, tint = GfColor.Coral, modifier = Modifier.size(16.dp))
+                        Text(state.lastError.orEmpty(), color = GfColor.Coral, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, lineHeight = 17.sp)
+                    }
+                    else -> {
+                        Icon(msIcon("check_circle"), null, tint = GfColor.Accent, modifier = Modifier.size(16.dp))
+                        Text(state.lastResult.orEmpty(), color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, lineHeight = 17.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun fileStamp(): String =
+    java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
 
 @Composable
 private fun ImportExportSection(vm: AppViewModel) {
@@ -366,7 +514,10 @@ private fun relativeTime(ms: Long): String {
         mins < 1 -> "just now"
         mins < 60 -> "${mins}m ago"
         mins < 1440 -> "${mins / 60}h ago"
-        else -> "${mins / 1440}d ago"
+        // Past a week "412d ago" stops being readable — and a backup's age is exactly the number a
+        // user needs to judge at a glance, so fall back to a real date.
+        mins < 10_080 -> "${mins / 1440}d ago"
+        else -> java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.US).format(java.util.Date(ms))
     }
 }
 
