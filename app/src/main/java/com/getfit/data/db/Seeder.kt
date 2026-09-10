@@ -6,7 +6,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 /**
- * Seeds the library from assets/exercises.json (1,324) plus the 18 curated exercises, then the
+ * Seeds the library from assets/exercises.json (1,342) plus the 18 curated exercises, then the
  * prototype's demo history and targets — so a fresh install mirrors the prototype's first-run state.
  */
 object Seeder {

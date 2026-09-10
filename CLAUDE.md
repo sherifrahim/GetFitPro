@@ -4,17 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A **native Android port of the GetFit fitness app**. The app currently exists only as a
+A **native Android port of the GetFit fitness app**, shipped as **Forge**. The app began as a
 high-fidelity, fully-working HTML/JS prototype — `GetFit.dc.html`. That prototype is the
-**source of truth** for layout, visual design, copy, interactions, animations, and — critically —
-**all state/business logic**. The Android app (Kotlin + Jetpack Compose) is being built to look
-and behave identically.
+**source of truth** for layout, copy, interactions, animations, and — critically —
+**all state/business logic**.
 
-> Status: **built and running.** The Android app lives in `app/` (Kotlin + Compose). All 12
-> planned phases are implemented and verified on an emulator: splash → onboarding → home →
+> ⚠️ **Colour is the one exception, and it is no longer the prototype's.** The palette was
+> deliberately replaced (lime `#CBF25C` on warm brown `#17120D` → blue `#0B7BF7` on true black)
+> at the user's request, in the style of Hevy. `core/theme/Tokens.kt` is now the sole authority
+> on colour. **Do not "restore" prototype colours** — see *Theme* below before touching any.
+
+The Android app (Kotlin + Jetpack Compose) is otherwise built to look and behave identically.
+
+> Status: **built and running.** The phone app lives in `app/`, a Wear OS companion in `wear/`.
+> All 12 planned phases are implemented and verified on an emulator: splash → onboarding → home →
 > exercises → detail → builder → guided session → progress → settings, hydrated from Room +
-> DataStore. Domain logic + seeding are unit-tested (`app/src/test/…`, 28 tests). Build on the
-> `feat/android-mvp` branch. The build order/spec live in `docs/superpowers/`.
+> DataStore. Since then: AI review, CSV import/export, cloud-sync groundwork (inert), a Wear OS
+> companion, rest-timer feedback, and the trend insight. Unit tests live in `app/src/test/…`
+> (**101 tests**). The build order/spec live in `docs/superpowers/`.
 
 ## UI architecture note (important)
 
@@ -32,11 +39,69 @@ all overlays (detail, session, settings, onboarding, splash, goal sheet, toast).
 Read it before touching a feature. It is a single-file app in a custom React-like framework
 (`<x-dc>` templating + a `DCLogic` component class). The important parts:
 
-- **Markup** (lines ~37–671): every screen and overlay, with exact colors/sizes/copy/animations
-  inlined as styles. Template bindings look like `{{ x }}`, loops `<sc-for>`, conditionals `<sc-if>`.
+- **Markup** (lines ~37–671): every screen and overlay, with exact sizes/copy/animations inlined as
+  styles. Template bindings look like `{{ x }}`, loops `<sc-for>`, conditionals `<sc-if>`. Take
+  layout, spacing, copy and motion from here — but **not colours** (see *Theme* below).
 - **Logic** (`<script data-dc-script>`, lines ~673–1058): the `Component extends DCLogic` class holds
   the entire state model, seed data, and all computed values in `renderVals()`. **This is the Kotlin
   logic spec.** Port its behavior exactly; do not "improve" the math.
+
+## Theme (supersedes the prototype)
+
+`core/theme/Tokens.kt` is the only authority on colour. The prototype's warm/lime palette was
+replaced on request with a black + blue scheme:
+
+| role      | was (prototype)          | now                                   |
+|-----------|--------------------------|---------------------------------------|
+| surfaces  | `#17120D` / `#211A12`    | `#000000` / `#121212` (neutral)       |
+| accent    | `#CBF25C` lime           | `#0B7BF7` blue, **white** on it       |
+| text      | `#F6F0E6` warm off-white | `#FFFFFF` + a neutral grey ramp       |
+| hairlines | `rgba(246,240,230,a)`    | `rgba(255,255,255,a)`                 |
+
+Notes for anyone changing colour:
+
+- Tokens are named `Accent` / `AccentFill*`, **not** `Lime` — don't reintroduce hue-specific names.
+- Difficulty pills and the trend card are **monochrome**; difficulty encodes rank as *brightness*
+  rather than hue. Two semantic colours deliberately survive because they carry information, not
+  brand: **amber** = the rest phase, **coral** = destructive actions.
+- White on `#0B7BF7` is ~4.1:1 — fine for the large bold button labels it's used for, **not** for
+  small text. Keep body copy off the accent fill.
+- Colour also lives outside Kotlin: `res/values/colors.xml` (`windowBackground` paints before
+  Compose's first frame, so a stale value shows as a coloured flash at cold start), both launcher
+  icons, the onboarding slides in `data/db/Curated.kt`, and `wear/…/theme/WearTheme.kt`. Change
+  them together.
+
+## Wear OS companion (`wear/`)
+
+Separate module, bundled via `wearApp` from `app/build.gradle.kts`. Design doc:
+`docs/wear-companion-design.md`. Phone side is `data/wear/PhoneWearSync.kt` + `WearProtocol.kt`;
+watch side is `wear/…/wear/data/`. `MessageClient`, not `DataClient` (see the doc for why). Heart
+rate via Health Services `ExerciseClient`, batched every 8s.
+
+- The protocol data classes are **deliberately duplicated** on both sides rather than shared via a
+  module. Keep that. `WearProtocolDriftTest` fails the build if the two copies stop agreeing, and
+  `app/build.gradle.kts` declares both files as test-task inputs so editing only the watch copy
+  still re-runs it.
+- **Do not hand-manage Guava in `wear/build.gradle.kts`.** Forcing `listenablefuture` across all
+  configurations, or excluding full Guava from `health-services-client`, crashes the watch app on
+  launch (`NoClassDefFoundError: com.google.common.base.Preconditions`). The force must stay scoped
+  to `*CompileClasspath`. The comments in that file explain the whole trap — read them first.
+- Status: builds, installs, and runs to its Idle screen on a Wear OS 5.1 emulator. **Phone↔watch
+  mirroring and heart rate are still unverified** — that needs a paired device, and emulator
+  pairing needs the Wear OS companion app (Play Store image + Google sign-in).
+
+## Post-MVP features
+
+- **AI review** (`data/ai/`) — sends the user's own Anthropic API key to the Messages API over plain
+  `HttpURLConnection`. No Retrofit/OkHttp: this project avoids new Gradle dependencies where a
+  simpler built-in approach works.
+- **Import/export** (`data/importexport/`) — Hevy/Strong/FitNotes/Forge CSV. Matches column **names**,
+  not positions, because real sample exports couldn't be verified up front.
+- **Cloud sync** (`data/sync/`) — client-side groundwork only (DataStore outbox, repo, HTTP stub).
+  Deliberately inert until a real server URL is supplied via Settings. **Don't build server-side
+  anything without one.**
+- **Trend insight** (`domain/Trend.kt`) — pure Kotlin, no network; surfaced on Detail and fed to the
+  AI review prompt as a pre-computed fact so the model explains it rather than re-deriving it.
 
 ## Logic that must stay byte-for-byte faithful
 
@@ -95,16 +160,29 @@ prototype map to these (see the design doc for the table).
 
 ## Commands
 
-Android toolchain (apply once the Gradle module is scaffolded — min SDK 26, target latest, Compose BOM, KTS):
+Two modules: `:app` (phone, min SDK 26) and `:wear` (Wear OS, min SDK 30). Always build both —
+`:app` compiling proves nothing about `:wear`.
 
 ```bash
-./gradlew assembleDebug            # build
-./gradlew installDebug             # build + install on device/emulator
-./gradlew testDebugUnitTest        # JVM unit tests (domain logic)
-./gradlew testDebugUnitTest --tests "com.getfit.domain.PrTest"   # single test class
-./gradlew connectedDebugAndroidTest   # instrumented/Compose UI tests
-./gradlew lintDebug                # Android lint
+./gradlew :app:assembleDebug :wear:assembleDebug   # build both (do this first)
+./gradlew :app:installDebug                        # install phone app
+./gradlew :app:testDebugUnitTest                   # JVM unit tests (101)
+./gradlew :app:testDebugUnitTest --tests "com.getfit.domain.PrTest"   # single test class
+./gradlew :app:connectedDebugAndroidTest           # instrumented/Compose UI tests
+./gradlew :app:lintDebug                           # Android lint
 ```
+
+Environment notes (already solved — don't rediscover):
+
+- **`JAVA_HOME`** is pinned via `org.gradle.java.home` in `gradle.properties` (Android Studio's
+  bundled JBR). No need to set it manually.
+- **`local.properties`** is gitignored, so a fresh **git worktree** has no SDK path and every build
+  fails with "SDK location not found". Copy it in from the main checkout.
+- **Don't move the repo back under OneDrive** — it locked files mid-build and caused repeated
+  Gradle failures. `D:\GetFitPro` is deliberate.
+- AGP was bumped to 8.13.2 by Android Studio itself. That's intentional; leave it.
+- Piping gradle through `| tail` **masks its exit code** — check `${PIPESTATUS[0]}` or redirect to a
+  file, or a failed build will look like it passed.
 
 ## Planning artifacts
 
@@ -113,4 +191,5 @@ Android toolchain (apply once the Gradle module is scaffolded — min SDK 26, ta
   data layer + domain tests → Home → Exercises → Detail → Builder → Session → Progress → Settings →
   Onboarding/Splash → animation polish).
 
-Work through screens in that order. When a value is unclear, open `GetFit.dc.html` and copy it exactly.
+Work through screens in that order. When a value is unclear, open `GetFit.dc.html` and copy it
+exactly — **except colours**, which come from `core/theme/Tokens.kt`, not the prototype.

@@ -5,7 +5,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * Exercise library row. The 1,324 dataset records are mapped into the app's muscle-group model;
+ * Exercise library row. The 1,342 dataset records are mapped into the app's muscle-group model;
  * the 18 prototype-curated exercises are also inserted (curated = true) to power the default plan,
  * demo history and PR seed exactly like the prototype.
  */
