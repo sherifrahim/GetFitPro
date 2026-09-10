@@ -27,15 +27,23 @@ android {
     buildFeatures { compose = true }
 }
 
-// One of the AndroidX BOM alignment platforms on this module's classpath publishes a `strictly`
-// constraint that substitutes com.google.guava:listenablefuture:1.0 (the real stub, containing the
-// actual ListenableFuture class) with 9999.0-empty-to-avoid-conflict-with-guava (an intentionally
-// empty jar, meant only for when full Guava is also present). Confirmed via
-// `.\gradlew :wear:dependencies --configuration debugCompileClasspath`, which showed
-// "com.google.guava:listenablefuture:1.0 -> 9999.0-empty-to-avoid-conflict-with-guava". A normal
-// dependency declaration can't outrank a `strictly` constraint from upstream metadata, so it has to
-// be forced here.
-configurations.all {
+// Read the Guava note on health-services-client below before touching this. The scope of this
+// force is load-bearing: COMPILE classpath only, never runtime.
+//
+// An AndroidX alignment platform publishes a `strictly` constraint substituting
+// com.google.guava:listenablefuture:1.0 (the real stub, holding the actual ListenableFuture class)
+// with 9999.0-empty-to-avoid-conflict-with-guava (a deliberately EMPTY jar). That substitution is
+// correct at runtime — full Guava is there and already supplies the class, so the empty jar is what
+// keeps it from being a duplicate. But it also empties our compileOnly stub, leaving the compile
+// classpath with no ListenableFuture at all (health-services-client declares Guava as
+// `implementation`, so it doesn't hand us one). Forcing the real 1.0 back for compilation only
+// fixes that without putting a second copy of the class into the APK.
+//
+// This was previously `configurations.all`, which applied the force to the runtime classpath too
+// and produced a genuine "Duplicate class ListenableFuture" at package time. Excluding full Guava
+// to silence that then stripped com.google.common.base.Preconditions, which Health Services calls
+// internally, crashing the watch app on launch. Keep the force narrow instead.
+configurations.matching { it.name.endsWith("CompileClasspath") }.configureEach {
     resolutionStrategy {
         force("com.google.guava:listenablefuture:1.0")
     }
@@ -54,22 +62,30 @@ dependencies {
     implementation(libs.androidx.wear.compose.foundation)
 
     implementation(libs.play.services.wearable)
-    // health-services-client transitively pulls in the FULL com.google.guava:guava:31.1-android jar,
-    // which bundles its own copy of ListenableFuture. Normally Guava's own metadata routes that
-    // bundled copy around the standalone listenablefuture stub to avoid a duplicate — but our forced
-    // resolution below (needed so the real class is available at compile time; see that comment)
-    // defeats that, producing a real "Duplicate class ListenableFuture" failure at package time
-    // (confirmed via `.\gradlew :wear:dependencies --configuration debugRuntimeClasspath`, which
-    // showed full guava:31.1-android as a direct dependency of health-services-client). We only ever
-    // need the bare ListenableFuture interface, nothing else full Guava provides, so drop it here and
-    // let the small stub below supply the class everywhere instead.
-    implementation(libs.androidx.health.services.client) {
-        exclude(group = "com.google.guava", module = "guava")
-    }
-    // ExerciseClient methods return Guava's ListenableFuture; Health Services doesn't expose the
-    // class to this module's compile classpath on its own, so it's declared directly. This is the
-    // small purpose-built stub (just the ListenableFuture interface), not the full Guava library.
-    implementation(libs.guava.listenablefuture)
+    // health-services-client transitively brings the FULL com.google.guava:guava jar. Leave it
+    // there. It supplies both ListenableFuture (which ExerciseClient's *Async methods return) and
+    // com.google.common.base.Preconditions, which Health Services' own internal IPC layer calls
+    // from ConnectionConfiguration.<init> on the very first HealthServices.getClient().
+    //
+    // Do NOT re-add either of these, both of which were here before and are why the watch app
+    // crashed on launch with NoClassDefFoundError: Preconditions:
+    //   * force("com.google.guava:listenablefuture:1.0")
+    //   * exclude(group = "com.google.guava", module = "guava") on this dependency
+    // The standalone listenablefuture artifact resolving to "9999.0-empty-to-avoid-conflict-with-
+    // guava" is not a problem to be fought — it is an intentionally EMPTY jar, and it is precisely
+    // the mechanism that prevents a duplicate ListenableFuture when full Guava is present. Forcing
+    // it back to the real 1.0 stub re-introduced that duplicate; excluding full Guava to silence
+    // *that* then removed Preconditions and broke the app at runtime. Nothing in this module names
+    // compile time either. Default runtime resolution is correct on its own.
+    implementation(libs.androidx.health.services.client)
+    // ...with one exception, which must stay compileOnly. health-services-client declares Guava as
+    // `implementation`, so it is on our RUNTIME classpath but not our COMPILE classpath, and Kotlin
+    // still has to resolve ExerciseClient.startExerciseAsync's ListenableFuture return type to
+    // type-check the call — even though we discard the value. compileOnly puts the interface on the
+    // compile classpath without packaging it, so it cannot duplicate full Guava's copy in the APK.
+    // Anything stronger than compileOnly here (implementation/api) re-creates the duplicate-class
+    // failure at package time.
+    compileOnly(libs.guava.listenablefuture)
     implementation(libs.kotlinx.serialization.json)
 
     debugImplementation(libs.androidx.ui.tooling)
