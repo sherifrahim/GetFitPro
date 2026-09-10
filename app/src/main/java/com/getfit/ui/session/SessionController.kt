@@ -1,5 +1,6 @@
 package com.getfit.ui
 
+import com.getfit.core.util.SessionFeedback
 import com.getfit.data.db.Curated
 import com.getfit.data.prefs.PlanItemData
 import com.getfit.di.AppContainer
@@ -51,9 +52,15 @@ class SessionController(
     private var ticker: Job? = null
     @Volatile private var units: String = "kg"
     @Volatile private var autorest: Boolean = true
+    @Volatile private var soundOn: Boolean = true
+    @Volatile private var hapticsOn: Boolean = true
 
     init {
-        scope.launch { container.settingsStore.flow.collect { units = it.units; autorest = it.autorest } }
+        scope.launch {
+            container.settingsStore.flow.collect {
+                units = it.units; autorest = it.autorest; soundOn = it.sound; hapticsOn = it.haptics
+            }
+        }
         // Restore an in-progress session after process death, resyncing its clock immediately
         // (rather than waiting for the next tick) so a long gap since the last persist — the app
         // having been closed, not just backgrounded — is reflected right away.
@@ -108,7 +115,16 @@ class SessionController(
                 delay(1000)
                 val s = _state.value ?: break
                 if (s.phase == Phase.DONE) break
-                _state.update { it?.let { cur -> tick(cur, System.currentTimeMillis()) } }
+                val next = tick(s, System.currentTimeMillis())
+                // Rest ending here means it expired naturally (not a user tap on Skip/±15, which
+                // already have their own tap-driven feedback in SessionScreen.kt) — the one point in
+                // the flow with no Compose click handler to hang a cue off, so it's fired here
+                // instead. advanceFromRest always lands on WORK, never DONE, so this check alone is
+                // exhaustive for "rest just ended" whether that's the next set or the next exercise.
+                if (s.phase == Phase.REST && next.phase == Phase.WORK) {
+                    SessionFeedback.restEnded(container.appContext, soundOn, hapticsOn)
+                }
+                _state.value = next
             }
         }
     }

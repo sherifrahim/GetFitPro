@@ -16,6 +16,7 @@ import com.getfit.data.repo.WorkoutRepo
 import com.getfit.data.security.SecureKeyStore
 import com.getfit.data.sync.SyncRepo
 import com.getfit.data.sync.SyncStore
+import com.getfit.data.wear.PhoneWearSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,7 +25,7 @@ import kotlinx.coroutines.launch
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "getfit")
 
 /** Manual DI root — built once in GetFitApp, holds the db, stores and repos. */
-class AppContainer(private val appContext: Context) {
+class AppContainer(val appContext: Context) {
 
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -43,6 +44,7 @@ class AppContainer(private val appContext: Context) {
     val workoutRepo = WorkoutRepo(planStore, db.exerciseDao(), db.logDao(), db.sessionDao(), syncRepo)
     val progressRepo = ProgressRepo(db.sessionDao(), db.targetDao(), syncRepo)
     val importExportRepo = ImportExportRepo(db.exerciseDao(), db.logDao(), db.sessionDao())
+    val phoneWearSync = PhoneWearSync(appContext)
 
     /** Seed the library + demo data on first launch (idempotent). */
     fun seedOnFirstLaunch() {

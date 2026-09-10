@@ -17,8 +17,12 @@ private const val SYSTEM_PROMPT =
         "workout history from their Forge app. Give a short, practical review: what's trending " +
         "well, what looks stalled or inconsistent, and 2-4 concrete, specific suggestions for the " +
         "next few weeks (progression, volume, recovery, exercise selection). Be honest and " +
-        "specific, referencing the actual numbers given rather than generic advice. No filler, no " +
-        "disclaimers about not being a doctor. Plain text, a few short paragraphs, no markdown."
+        "specific, referencing the actual numbers given rather than generic advice. If a " +
+        "'Trend classification' section is present, treat those verdicts (improving/plateaued/" +
+        "declining) as already-computed facts — reference them in plain language and explain what " +
+        "to do about them, don't re-derive or second-guess the classification itself from the raw " +
+        "numbers. No filler, no disclaimers about not being a doctor. Plain text, a few short " +
+        "paragraphs, no markdown."
 
 @Serializable
 private data class AnthropicMessage(val role: String, val content: String)

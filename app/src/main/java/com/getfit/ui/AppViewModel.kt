@@ -12,12 +12,15 @@ import com.getfit.data.db.TargetEntity
 import com.getfit.data.importexport.ImportOutcome
 import com.getfit.data.prefs.PlanItemData
 import com.getfit.data.prefs.Settings
+import com.getfit.data.wear.ActionKind
+import com.getfit.data.wear.toWearSnapshot
 import com.getfit.di.AppContainer
 import com.getfit.domain.Best
 import com.getfit.domain.LoggedSet
 import com.getfit.domain.Units
 import com.getfit.domain.bestFor
 import com.getfit.domain.isBW
+import com.google.android.gms.wearable.MessageClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -194,6 +197,38 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun startSingle(id: String, reps: String) { sessionController.start(listOf(PlanItemData(id, 3, reps))) }
     fun endSession() = viewModelScope.launch { sessionController.endAndSave(); selectTab(TAB_PROGRESS) }
 
+    // ---- wear OS companion (mirror session state to a paired watch, apply actions/heart rate it
+    // sends back) — see docs/wear-companion-design.md. Placed here, after sessionController exists,
+    // rather than in the class's first init{} block above: that block runs before sessionController's
+    // own initializer, so referencing it there would read it before construction.
+    private val _liveHeartRateBpm = MutableStateFlow<Double?>(null)
+    val liveHeartRateBpm: StateFlow<Double?> = _liveHeartRateBpm.asStateFlow()
+
+    private val wearListener: MessageClient.OnMessageReceivedListener
+
+    init {
+        viewModelScope.launch {
+            sessionController.state.collect { s ->
+                container.phoneWearSync.sendSnapshot(toWearSnapshot(s, settings.value.units))
+            }
+        }
+        wearListener = container.phoneWearSync.listen(
+            onAction = { action ->
+                when (action.kind) {
+                    ActionKind.DONE_SET -> sessionController.doneSet()
+                    ActionKind.SKIP_REST -> sessionController.skip()
+                    ActionKind.ADJUST_REST -> sessionController.addRest(action.restDeltaSec)
+                }
+            },
+            onHeartRate = { batch -> batch.samples.lastOrNull()?.let { _liveHeartRateBpm.value = it.bpm } },
+        )
+    }
+
+    override fun onCleared() {
+        container.phoneWearSync.stopListening(wearListener)
+        super.onCleared()
+    }
+
     // ---- AI review ----
     fun openAiReview() = _nav.update { it.copy(aiReviewOpen = true) }
     fun closeAiReview() = _nav.update { it.copy(aiReviewOpen = false) }
@@ -212,7 +247,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 return@launch
             }
             val d = data.value
-            val summary = buildWorkoutSummary(d.sessions, d.targets, d.bestMap, d.exercises, settings.value.units)
+            val summary = buildWorkoutSummary(d.sessions, d.targets, d.bestMap, d.exercises, settings.value.units, d.logs)
             when (val result = AiReviewClient.review(apiKey, settings.value.aiModel, summary)) {
                 is AiReviewResult.Success -> _aiReview.update { it.copy(loading = false, text = result.text, error = null) }
                 is AiReviewResult.Failure -> _aiReview.update { it.copy(loading = false, error = result.message) }

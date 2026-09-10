@@ -2,10 +2,14 @@ package com.getfit.data.ai
 
 import com.getfit.data.db.ExerciseEntity
 import com.getfit.data.db.SessionEntity
+import com.getfit.data.db.SetLogEntity
 import com.getfit.data.db.TargetEntity
 import com.getfit.domain.Best
+import com.getfit.domain.LoggedSet
 import com.getfit.domain.SessionRecord
+import com.getfit.domain.TrendVerdict
 import com.getfit.domain.Units
+import com.getfit.domain.analyzeTrend
 import com.getfit.domain.fmtDur
 import com.getfit.domain.fmtVol
 import com.getfit.domain.fmtW
@@ -30,6 +34,7 @@ fun buildWorkoutSummary(
     bestMap: Map<String, Best>,
     exercises: List<ExerciseEntity>,
     units: String,
+    logs: List<SetLogEntity> = emptyList(),
 ): String {
     if (sessions.isEmpty()) return "No workouts logged yet."
 
@@ -67,6 +72,27 @@ fun buildWorkoutSummary(
             val name = byId[id]?.name ?: id
             val value = if (best.bodyweight) "${best.reps} reps" else "${Units.fmtDisplay(best.weight, units)} $units x ${best.reps}"
             sb.appendLine("- $name: $value")
+        }
+    }
+
+    if (logs.isNotEmpty()) {
+        // Pre-computed on-device trend verdicts (see domain/Trend.kt) fed in as plain-language facts
+        // rather than raw numbers, so the model reasons from the same classification the app itself
+        // shows on the Detail screen instead of re-deriving (and possibly disagreeing with) it.
+        val logsByEx = logs.groupBy { it.exerciseId }
+        val trendLines = logsByEx.entries.mapNotNull { (id, exLogs) ->
+            val ex = byId[id] ?: return@mapNotNull null
+            val bw = isBW(ex.equipment, ex.reps)
+            val loggedSets = exLogs.map { LoggedSet(it.exerciseId, it.weight, it.reps, it.dateMs) }
+            val trend = analyzeTrend(loggedSets, bw)
+            if (trend.verdict == TrendVerdict.INSUFFICIENT_DATA) null else ex.name to trend
+        }
+        if (trendLines.isNotEmpty()) {
+            sb.appendLine()
+            sb.appendLine("Trend classification (pre-computed, not for you to recompute):")
+            trendLines.sortedBy { it.first }.forEach { (name, trend) ->
+                sb.appendLine("- $name: ${trend.verdict.name.lowercase()} — ${trend.message}")
+            }
         }
     }
 

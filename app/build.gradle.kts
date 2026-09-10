@@ -87,6 +87,14 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
 
+    // Phone side of the wear companion's MessageClient link (send session snapshots, receive watch
+    // actions + heart rate). Same artifact the wear module uses; doesn't pull in full Guava on its
+    // own (only androidx.health:health-services-client, wear-module-only, did that), so no repeat of
+    // the ListenableFuture duplicate-class conflict is expected here.
+    implementation(libs.play.services.wearable)
+
+    wearApp(project(":wear"))
+
     testImplementation(libs.junit)
     testImplementation(libs.truth)
     testImplementation(libs.robolectric)

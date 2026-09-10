@@ -63,7 +63,10 @@ import com.getfit.core.ui.ShimmerBox
 import com.getfit.core.ui.msIcon
 import com.getfit.core.ui.pressScale
 import com.getfit.domain.DAY_MS
+import com.getfit.domain.LoggedSet
+import com.getfit.domain.TrendVerdict
 import com.getfit.domain.Units
+import com.getfit.domain.analyzeTrend
 import com.getfit.domain.isBW
 import com.getfit.domain.targetDaysLeft
 import com.getfit.domain.targetPct
@@ -83,6 +86,12 @@ fun DetailScreen(vm: AppViewModel, id: String) {
     val target = data.targets.firstOrNull { it.exId == id }
     val inPlan = data.plan.any { it.id == id }
     val cues = remember(ex.cues) { ex.cues.split("||").filter { it.isNotBlank() } }
+    val trend = remember(data.logs, id, bw) {
+        analyzeTrend(
+            data.logs.filter { it.exerciseId == id }.map { LoggedSet(it.exerciseId, it.weight, it.reps, it.dateMs) },
+            bodyweight = bw,
+        )
+    }
 
     Column(Modifier.fillMaxSize().background(GfColor.Background).statusBarsPadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
@@ -155,6 +164,8 @@ fun DetailScreen(vm: AppViewModel, id: String) {
                         Text("Set a target", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.sp)
                     }
                 }
+
+                if (trend.verdict != TrendVerdict.INSUFFICIENT_DATA || cnt > 0) TrendCard(trend)
 
                 Text("How to perform", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp, modifier = Modifier.padding(top = 24.dp, bottom = 12.dp))
                 cues.forEachIndexed { i, c ->
@@ -265,6 +276,36 @@ private fun StatBox(label: String, main: String, sub: String, modifier: Modifier
         Text(sub, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.5.sp, modifier = Modifier.padding(top = 2.dp))
     }
 }
+
+/**
+ * On-device trend classification (domain/Trend.kt) — new to the app, not part of the prototype, so
+ * there's no reference design to match. Icons deliberately reuse ones already mapped in MsIcon.kt
+ * (trending_up / warning / monitoring / info) rather than adding new hand-authored SVG path data to
+ * ForgeIcons.kt for trending_down / trending_flat / query_stats that I can't visually verify renders
+ * correctly — a wrong-but-plausible custom icon path is a worse failure mode than reusing a slightly
+ * less literal existing one.
+ */
+@Composable
+private fun TrendCard(trend: com.getfit.domain.TrendResult) {
+    val (color, fill, label, icon) = when (trend.verdict) {
+        TrendVerdict.IMPROVING -> TrendStyle(GfColor.Lime, GfColor.LimeFill12, "Improving", "trending_up")
+        TrendVerdict.PLATEAUED -> TrendStyle(GfColor.Amber, GfColor.AmberFill13, "Plateaued", "monitoring")
+        TrendVerdict.DECLINING -> TrendStyle(GfColor.Coral, Color(0x21F0774E), "Declining", "warning")
+        TrendVerdict.INSUFFICIENT_DATA -> TrendStyle(GfColor.TextDim, GfColor.Hairline08, "Not enough data", "info")
+    }
+    Column(
+        Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(fill)
+            .border(1.dp, color.copy(alpha = 0.25f), RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Icon(msIcon(icon), null, tint = color, modifier = Modifier.size(18.dp))
+            Text(label.uppercase(), color = color, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 11.5.sp, letterSpacing = 0.6.sp)
+        }
+        Text(trend.message, color = GfColor.TextCue, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(top = 7.dp))
+    }
+}
+
+private data class TrendStyle(val color: Color, val fill: Color, val label: String, val icon: String)
 
 @Composable
 private fun ProgressBar(pct: Float, modifier: Modifier = Modifier) {
