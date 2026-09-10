@@ -107,3 +107,17 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }
+
+// WearProtocolDriftTest reads the two duplicated protocol files as text — and one of them lives in
+// the :wear module, which nothing here otherwise depends on. Gradle cannot infer that, so without
+// declaring them the unit-test task stays UP-TO-DATE when only the watch copy changes: the test
+// would be silently skipped in precisely the situation it exists to catch. Confirmed by adding a
+// field to the watch copy alone and watching ":app:testDebugUnitTest UP-TO-DATE" scroll past.
+tasks.withType<Test>().configureEach {
+    inputs.files(
+        rootProject.file("app/src/main/java/com/getfit/data/wear/WearProtocol.kt"),
+        rootProject.file("wear/src/main/java/com/getfit/wear/data/WearProtocol.kt"),
+    )
+        .withPropertyName("wearProtocolSources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
