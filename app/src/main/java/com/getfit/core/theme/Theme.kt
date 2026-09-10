@@ -10,7 +10,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val GfDarkColors = darkColorScheme(
-    primary = GfColor.Lime,
+    primary = GfColor.Accent,
     onPrimary = GfColor.OnAccent,
     secondary = GfColor.Amber,
     background = GfColor.Background,

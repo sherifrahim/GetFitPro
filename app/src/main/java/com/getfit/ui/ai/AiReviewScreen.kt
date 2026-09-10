@@ -89,7 +89,7 @@ private fun NoKeyState(onOpenSettings: () -> Unit) {
         )
         Row(
             Modifier.padding(top = 22.dp).height(50.dp).pressScale(remember { MutableInteractionSource() }, 0.97f)
-                .clip(RoundedCornerShape(16.dp)).background(GfColor.Lime)
+                .clip(RoundedCornerShape(16.dp)).background(GfColor.Accent)
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onOpenSettings)
                 .padding(horizontal = 22.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -102,7 +102,7 @@ private fun NoKeyState(onOpenSettings: () -> Unit) {
 @Composable
 private fun IdleState(onStart: () -> Unit) {
     Column(Modifier.padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(msIcon("smart_display"), null, tint = GfColor.Lime, modifier = Modifier.size(40.dp))
+        Icon(msIcon("smart_display"), null, tint = GfColor.Accent, modifier = Modifier.size(40.dp))
         Text(
             "Get a read on your training", color = GfColor.Text, fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.W700, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp),
@@ -114,7 +114,7 @@ private fun IdleState(onStart: () -> Unit) {
         )
         Row(
             Modifier.padding(top = 22.dp).height(50.dp).pressScale(remember { MutableInteractionSource() }, 0.97f)
-                .clip(RoundedCornerShape(16.dp)).background(GfColor.Lime)
+                .clip(RoundedCornerShape(16.dp)).background(GfColor.Accent)
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onStart)
                 .padding(horizontal = 22.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -149,7 +149,7 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
         }
         Text(message, color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 13.5.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 8.dp))
         Row(
-            Modifier.padding(top = 16.dp).height(44.dp).clip(RoundedCornerShape(14.dp)).background(GfColor.Lime)
+            Modifier.padding(top = 16.dp).height(44.dp).clip(RoundedCornerShape(14.dp)).background(GfColor.Accent)
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onRetry)
                 .padding(horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -180,7 +180,7 @@ private fun ReviewResult(text: String, onRefresh: () -> Unit) {
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(msIcon("history"), null, tint = GfColor.Lime, modifier = Modifier.size(18.dp))
+            Icon(msIcon("history"), null, tint = GfColor.Accent, modifier = Modifier.size(18.dp))
             Text("Get a fresh review", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.5.sp)
         }
         Spacer(Modifier.height(8.dp))

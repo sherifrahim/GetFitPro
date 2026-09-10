@@ -106,13 +106,13 @@ fun BuilderScreen(vm: AppViewModel) {
             val add = remember { MutableInteractionSource() }
             Row(
                 Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(16.dp))
-                    .border(1.5.dp, Color(0x66CBF25C), RoundedCornerShape(16.dp))
+                    .border(1.5.dp, Color(0x660B7BF7), RoundedCornerShape(16.dp))
                     .clickable(add, indication = null) { vm.goExercises() },
                 horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(msIcon("add"), null, tint = GfColor.Lime, modifier = Modifier.size(20.dp))
+                Icon(msIcon("add"), null, tint = GfColor.Accent, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Add exercise", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.5.sp)
+                Text("Add exercise", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.5.sp)
             }
         }
 
@@ -120,7 +120,7 @@ fun BuilderScreen(vm: AppViewModel) {
         val start = remember { MutableInteractionSource() }
         Row(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)
-                .height(56.dp).pressScale(start, 0.98f).clip(RoundedCornerShape(18.dp)).background(GfColor.Lime)
+                .height(56.dp).pressScale(start, 0.98f).clip(RoundedCornerShape(18.dp)).background(GfColor.Accent)
                 .clickable(start, indication = null) { vm.startSession(data.plan) },
             horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -149,8 +149,8 @@ private fun PlanRow(
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column {
-            Icon(msIcon("keyboard_arrow_up"), null, tint = if (isFirst) Color(0xFF3A342B) else GfColor.TextDim, modifier = Modifier.size(20.dp).clickable(remember { MutableInteractionSource() }, indication = null, onClick = onUp))
-            Icon(msIcon("keyboard_arrow_down"), null, tint = if (isLast) Color(0xFF3A342B) else GfColor.TextDim, modifier = Modifier.size(20.dp).clickable(remember { MutableInteractionSource() }, indication = null, onClick = onDown))
+            Icon(msIcon("keyboard_arrow_up"), null, tint = if (isFirst) Color(0xFF3A3A3A) else GfColor.TextDim, modifier = Modifier.size(20.dp).clickable(remember { MutableInteractionSource() }, indication = null, onClick = onUp))
+            Icon(msIcon("keyboard_arrow_down"), null, tint = if (isLast) Color(0xFF3A3A3A) else GfColor.TextDim, modifier = Modifier.size(20.dp).clickable(remember { MutableInteractionSource() }, indication = null, onClick = onDown))
         }
         Column(Modifier.weight(1f)) {
             Text(exName, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W600, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -160,9 +160,9 @@ private fun PlanRow(
             Modifier.clip(RoundedCornerShape(12.dp)).background(GfColor.Background).padding(horizontal = 6.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(msIcon("remove"), null, tint = GfColor.Lime, modifier = Modifier.size(18.dp).clickable(remember { MutableInteractionSource() }, indication = null, onClick = onLess))
+            Icon(msIcon("remove"), null, tint = GfColor.Accent, modifier = Modifier.size(18.dp).clickable(remember { MutableInteractionSource() }, indication = null, onClick = onLess))
             Text("${item.sets} × ${item.reps}", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 13.sp, modifier = Modifier.width(48.dp), maxLines = 1)
-            Icon(msIcon("add"), null, tint = GfColor.Lime, modifier = Modifier.size(18.dp).clickable(remember { MutableInteractionSource() }, indication = null, onClick = onMore))
+            Icon(msIcon("add"), null, tint = GfColor.Accent, modifier = Modifier.size(18.dp).clickable(remember { MutableInteractionSource() }, indication = null, onClick = onMore))
         }
         Icon(msIcon("delete"), null, tint = GfColor.TextFaint, modifier = Modifier.size(20.dp).clickable(remember { MutableInteractionSource() }, indication = null, onClick = onRemove))
     }

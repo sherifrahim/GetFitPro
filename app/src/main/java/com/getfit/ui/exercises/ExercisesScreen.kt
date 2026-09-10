@@ -118,7 +118,7 @@ private fun SearchField(query: String, hasQuery: Boolean, onChange: (String) -> 
             BasicTextField(
                 value = query, onValueChange = onChange, singleLine = true,
                 textStyle = LocalTextStyle.current.merge(TextStyle(color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 15.sp)),
-                cursorBrush = SolidColor(GfColor.Lime), modifier = Modifier.fillMaxWidth(),
+                cursorBrush = SolidColor(GfColor.Accent), modifier = Modifier.fillMaxWidth(),
             )
         }
         if (hasQuery) {
@@ -137,8 +137,8 @@ private fun ExerciseRow(ex: ExerciseEntity, best: Best?, units: String, onOpen: 
             .clickable(row, indication = null, onClick = onOpen).padding(11.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
-        Box(Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(GfColor.LimeFill12), contentAlignment = Alignment.Center) {
-            Icon(MuscleIcon.of(ex.muscle), null, tint = GfColor.Lime, modifier = Modifier.size(26.dp))
+        Box(Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(GfColor.AccentFill12), contentAlignment = Alignment.Center) {
+            Icon(MuscleIcon.of(ex.muscle), null, tint = GfColor.Accent, modifier = Modifier.size(26.dp))
         }
         Column(Modifier.weight(1f)) {
             Text(ex.name, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W600, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -146,7 +146,7 @@ private fun ExerciseRow(ex: ExerciseEntity, best: Best?, units: String, onOpen: 
         }
         if (best != null) {
             Column(horizontalAlignment = Alignment.End) {
-                Text(if (bw) "${best.reps} reps" else "${Units.fmtDisplay(best.weight, units)} $units", color = GfColor.Lime, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
+                Text(if (bw) "${best.reps} reps" else "${Units.fmtDisplay(best.weight, units)} $units", color = GfColor.Accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
                 Text("BEST", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 9.5.sp)
             }
         }
@@ -159,7 +159,7 @@ private fun ExerciseRow(ex: ExerciseEntity, best: Best?, units: String, onOpen: 
                 Modifier.size(34.dp).pressScale(add, 0.88f).clip(RoundedCornerShape(11.dp)).background(GfColor.SurfaceElevated),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(msIcon("add"), null, tint = GfColor.Lime, modifier = Modifier.size(20.dp))
+                Icon(msIcon("add"), null, tint = GfColor.Accent, modifier = Modifier.size(20.dp))
             }
         }
     }

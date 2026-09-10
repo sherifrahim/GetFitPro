@@ -60,7 +60,7 @@ fun SessionScreen(vm: AppViewModel) {
     val settings by vm.settings.collectAsState()
     val state = s ?: return
 
-    Box(Modifier.fillMaxSize().background(if (state.phase == Phase.DONE) GfColor.Lime else GfColor.Background)) {
+    Box(Modifier.fillMaxSize().background(if (state.phase == Phase.DONE) GfColor.Accent else GfColor.Background)) {
         if (state.phase == Phase.DONE) DoneView(state, settings.units, vm::endSession)
         else ActiveView(state, settings.units, vm)
     }
@@ -89,7 +89,7 @@ private fun ActiveView(s: SessionState, units: String, vm: AppViewModel) {
         // segment bar
         Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             s.items.forEachIndexed { i, _ ->
-                val c = when { i < s.idx -> GfColor.Lime; i == s.idx -> GfColor.Lime.copy(alpha = 0.45f); else -> GfColor.Hairline10 }
+                val c = when { i < s.idx -> GfColor.Accent; i == s.idx -> GfColor.Accent.copy(alpha = 0.45f); else -> GfColor.Hairline10 }
                 Box(Modifier.weight(1f).height(5.dp).clip(Pill).background(c))
             }
         }
@@ -98,14 +98,14 @@ private fun ActiveView(s: SessionState, units: String, vm: AppViewModel) {
         Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             ProgressRing(
                 progress = ringProgress, size = 210.dp, strokeWidth = 11.dp,
-                color = if (isRest) GfColor.Amber else GfColor.Lime,
+                color = if (isRest) GfColor.Amber else GfColor.Accent,
                 trackColor = GfColor.Hairline08,
                 animationSpec = if (isRest) tween(1000, easing = LinearEasing) else tween(600),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         if (isRest) "REST" else "SET ${s.setNum} OF ${it.sets}",
-                        color = if (isRest) GfColor.Amber else GfColor.Lime, fontFamily = Manrope,
+                        color = if (isRest) GfColor.Amber else GfColor.Accent, fontFamily = Manrope,
                         fontWeight = FontWeight.W800, fontSize = 11.5.sp, letterSpacing = 1.5.sp,
                     )
                     Text(
@@ -128,7 +128,7 @@ private fun ActiveView(s: SessionState, units: String, vm: AppViewModel) {
             Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 RestSideButton("−15") { tick(); ctrl.addRest(-15) }
                 Row(
-                    Modifier.weight(1f).height(56.dp).clip(RoundedCornerShape(16.dp)).background(GfColor.Lime)
+                    Modifier.weight(1f).height(56.dp).clip(RoundedCornerShape(16.dp)).background(GfColor.Accent)
                         .clickable(remember { MutableInteractionSource() }, indication = null) { tick(); click(); ctrl.skip() },
                     horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -148,7 +148,7 @@ private fun ActiveView(s: SessionState, units: String, vm: AppViewModel) {
             }
             Row(
                 Modifier.fillMaxWidth().height(58.dp).pressScale(remember { MutableInteractionSource() }, 0.98f)
-                    .clip(RoundedCornerShape(18.dp)).background(GfColor.Lime)
+                    .clip(RoundedCornerShape(18.dp)).background(GfColor.Accent)
                     .clickable(remember { MutableInteractionSource() }, indication = null) { tick(); click(); ctrl.doneSet() },
                 horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -180,7 +180,7 @@ private fun StepperCard(label: String, value: String, unit: String?, prBadge: Bo
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(label.uppercase(), color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 10.5.sp)
             if (prBadge) {
-                Box(Modifier.clip(Pill).background(GfColor.Lime).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                Box(Modifier.clip(Pill).background(GfColor.Accent).padding(horizontal = 6.dp, vertical = 2.dp)) {
                     Text("PR", color = GfColor.OnAccent, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 9.sp)
                 }
             }
@@ -204,7 +204,7 @@ private fun StepHit(icon: String, onClick: () -> Unit) {
         Modifier.size(44.dp).pressScale(interaction, 0.86f).clickable(interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(msIcon(icon), null, tint = GfColor.Lime, modifier = Modifier.size(30.dp))
+        Icon(msIcon(icon), null, tint = GfColor.Accent, modifier = Modifier.size(30.dp))
     }
 }
 
@@ -215,7 +215,7 @@ private fun DoneView(s: SessionState, units: String, onFinish: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
     ) {
         Box(Modifier.size(96.dp).clip(RoundedCornerShape(999.dp)).background(GfColor.OnAccent), contentAlignment = Alignment.Center) {
-            Icon(msIcon("check"), null, tint = GfColor.Lime, modifier = Modifier.size(54.dp))
+            Icon(msIcon("check"), null, tint = GfColor.Accent, modifier = Modifier.size(54.dp))
         }
         Text("Workout complete", color = GfColor.OnAccent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 28.sp, modifier = Modifier.padding(top = 22.dp))
         Text("Push Day · logged & saved", color = GfColor.OnAccentSub, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
@@ -233,7 +233,7 @@ private fun DoneView(s: SessionState, units: String, onFinish: () -> Unit) {
                     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(GfColor.OnAccent).padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Icon(msIcon("local_fire_department"), null, tint = GfColor.Amber, modifier = Modifier.size(20.dp))
                         Text(pr.name, color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.5.sp, modifier = Modifier.weight(1f))
-                        Text(pr.value, color = GfColor.Lime, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 13.5.sp)
+                        Text(pr.value, color = GfColor.Accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 13.5.sp)
                     }
                 }
             }
@@ -245,7 +245,7 @@ private fun DoneView(s: SessionState, units: String, onFinish: () -> Unit) {
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onFinish),
             contentAlignment = Alignment.Center,
         ) {
-            Text("Save & finish", color = GfColor.Lime, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
+            Text("Save & finish", color = GfColor.Accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
         }
     }
 }

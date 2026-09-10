@@ -37,7 +37,7 @@ fun SplashScreen() {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
-                Modifier.size(96.dp).scale(scale.value).clip(RoundedCornerShape(28.dp)).background(GfColor.Lime),
+                Modifier.size(96.dp).scale(scale.value).clip(RoundedCornerShape(28.dp)).background(GfColor.Accent),
                 contentAlignment = Alignment.Center,
             ) {
                 LogoMark(color = GfColor.OnAccent, modifier = Modifier.size(50.dp))

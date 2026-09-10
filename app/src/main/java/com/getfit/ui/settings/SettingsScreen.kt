@@ -69,7 +69,7 @@ fun SettingsScreen(vm: AppViewModel) {
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Brush.linearGradient(listOf(GfColor.SurfaceElevated, GfColor.SurfaceElevatedAlt))).border(1.dp, GfColor.Hairline06, RoundedCornerShape(22.dp)).padding(18.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Box(Modifier.size(58.dp).clip(Pill).background(GfColor.Lime), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(58.dp).clip(Pill).background(GfColor.Accent), contentAlignment = Alignment.Center) {
                     Text("AR", color = GfColor.OnAccent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 22.sp)
                 }
                 Column {
@@ -85,7 +85,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, indication = null) { vm.toggleUnits() }.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Icon(msIcon("straighten"), null, tint = GfColor.Lime, modifier = Modifier.size(22.dp))
+                    Icon(msIcon("straighten"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
                     Text("Units", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.5.sp, modifier = Modifier.weight(1f))
                     Row(Modifier.clip(Pill).background(GfColor.Background).padding(3.dp)) {
                         UnitPill("kg", settings.units == "kg")
@@ -105,7 +105,7 @@ fun SettingsScreen(vm: AppViewModel) {
                 listOf(30, 45, 60, 90).forEach { v ->
                     val sel = settings.restDefault == v
                     Box(
-                        Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(14.dp)).background(if (sel) GfColor.Lime else GfColor.Surface).border(1.dp, if (sel) GfColor.Lime else GfColor.Hairline08, RoundedCornerShape(14.dp))
+                        Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(14.dp)).background(if (sel) GfColor.Accent else GfColor.Surface).border(1.dp, if (sel) GfColor.Accent else GfColor.Hairline08, RoundedCornerShape(14.dp))
                             .clickable(remember { MutableInteractionSource() }, indication = null) { vm.setRest(v) },
                         contentAlignment = Alignment.Center,
                     ) {
@@ -137,10 +137,10 @@ fun SettingsScreen(vm: AppViewModel) {
 
             // privacy note
             Row(
-                Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0x12CBF25C)).border(1.dp, Color(0x24CBF25C), RoundedCornerShape(18.dp)).padding(16.dp),
+                Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0x120B7BF7)).border(1.dp, Color(0x240B7BF7), RoundedCornerShape(18.dp)).padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Icon(msIcon("lock"), null, tint = GfColor.Lime, modifier = Modifier.size(20.dp))
+                Icon(msIcon("lock"), null, tint = GfColor.Accent, modifier = Modifier.size(20.dp))
                 Text("Private by design. Everything — your logs, PRs and targets — stays on your device, with no account required. AI review and sync are opt-in and only reach the network when you turn them on.", color = GfColor.TextCue, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 13.sp, lineHeight = 20.sp)
             }
         }
@@ -149,7 +149,7 @@ fun SettingsScreen(vm: AppViewModel) {
 
 @Composable
 private fun UnitPill(text: String, selected: Boolean) {
-    Box(Modifier.clip(Pill).background(if (selected) GfColor.Lime else Color.Transparent).padding(horizontal = 14.dp, vertical = 5.dp)) {
+    Box(Modifier.clip(Pill).background(if (selected) GfColor.Accent else Color.Transparent).padding(horizontal = 14.dp, vertical = 5.dp)) {
         Text(text, color = if (selected) GfColor.OnAccent else GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.sp)
     }
 }
@@ -160,7 +160,7 @@ private fun ToggleRow(icon: String, label: String, on: Boolean, onToggle: (Boole
         Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, indication = null) { onToggle(!on) }.padding(16.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Icon(msIcon(icon), null, tint = GfColor.Lime, modifier = Modifier.size(22.dp))
+        Icon(msIcon(icon), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
         Text(label, color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.5.sp, modifier = Modifier.weight(1f))
         GfSwitch(on)
     }
@@ -170,7 +170,7 @@ private fun ToggleRow(icon: String, label: String, on: Boolean, onToggle: (Boole
 private fun GfSwitch(on: Boolean) {
     val knobX by animateDpAsState(if (on) 19.dp else 0.dp, label = "knob")
     Box(
-        Modifier.size(width = 46.dp, height = 27.dp).clip(Pill).background(if (on) GfColor.Lime else GfColor.Hairline12).padding(3.dp),
+        Modifier.size(width = 46.dp, height = 27.dp).clip(Pill).background(if (on) GfColor.Accent else GfColor.Hairline12).padding(3.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         Box(Modifier.offset(x = knobX).size(21.dp).clip(Pill).background(Color.White))
@@ -188,7 +188,7 @@ private fun AiKeySection(hasAiKey: Boolean, model: String, vm: AppViewModel) {
             .border(1.dp, GfColor.Hairline06, RoundedCornerShape(20.dp)).padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(msIcon(if (hasAiKey) "check_circle" else "info"), null, tint = if (hasAiKey) GfColor.Lime else GfColor.TextFaint, modifier = Modifier.size(16.dp))
+            Icon(msIcon(if (hasAiKey) "check_circle" else "info"), null, tint = if (hasAiKey) GfColor.Accent else GfColor.TextFaint, modifier = Modifier.size(16.dp))
             Text(
                 if (hasAiKey) "API key saved" else "No API key set", color = GfColor.TextDim, fontFamily = Manrope,
                 fontWeight = FontWeight.W600, fontSize = 12.5.sp,
@@ -219,7 +219,7 @@ private fun AiKeySection(hasAiKey: Boolean, model: String, vm: AppViewModel) {
                     )
                 }
                 Text(
-                    "Save", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
+                    "Save", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
                     modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null) {
                         if (keyInput.isNotBlank()) { vm.setAiApiKey(keyInput); keyInput = "" }
                     },
@@ -260,7 +260,7 @@ private fun ImportExportSection(vm: AppViewModel) {
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Icon(msIcon("keyboard_arrow_down"), null, tint = GfColor.Lime, modifier = Modifier.size(22.dp))
+            Icon(msIcon("keyboard_arrow_down"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
             Column(Modifier.weight(1f)) {
                 Text("Import workouts", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.5.sp)
                 Text("From Hevy, Strong, FitNotes or a Forge export (.csv)", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
@@ -274,7 +274,7 @@ private fun ImportExportSection(vm: AppViewModel) {
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Icon(msIcon("keyboard_arrow_up"), null, tint = GfColor.Lime, modifier = Modifier.size(22.dp))
+            Icon(msIcon("keyboard_arrow_up"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
             Column(Modifier.weight(1f)) {
                 Text("Export workouts", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.5.sp)
                 Text("Every logged set as a re-importable .csv", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
@@ -294,7 +294,7 @@ private fun ImportExportSection(vm: AppViewModel) {
                         Text(state.lastError.orEmpty(), color = GfColor.Coral, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, lineHeight = 17.sp)
                     }
                     else -> {
-                        Icon(msIcon("check_circle"), null, tint = GfColor.Lime, modifier = Modifier.size(16.dp))
+                        Icon(msIcon("check_circle"), null, tint = GfColor.Accent, modifier = Modifier.size(16.dp))
                         Text(state.lastResult.orEmpty(), color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, lineHeight = 17.sp)
                     }
                 }
@@ -314,7 +314,7 @@ private fun SyncSection(vm: AppViewModel) {
             .border(1.dp, GfColor.Hairline06, RoundedCornerShape(20.dp)).padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(msIcon(if (connected) "check_circle" else "info"), null, tint = if (connected) GfColor.Lime else GfColor.TextFaint, modifier = Modifier.size(16.dp))
+            Icon(msIcon(if (connected) "check_circle" else "info"), null, tint = if (connected) GfColor.Accent else GfColor.TextFaint, modifier = Modifier.size(16.dp))
             Text(
                 if (connected) "Server configured" else "No sync server set", color = GfColor.TextDim, fontFamily = Manrope,
                 fontWeight = FontWeight.W600, fontSize = 12.5.sp,
@@ -330,7 +330,7 @@ private fun SyncSection(vm: AppViewModel) {
         GfTextField(value = urlInput, onValueChange = { urlInput = it }, placeholder = "https://your-server.example.com", masked = false)
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
             Text(
-                "Save", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
+                "Save", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
                 modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null) { vm.setSyncServerUrl(urlInput) },
             )
         }
@@ -350,7 +350,7 @@ private fun SyncSection(vm: AppViewModel) {
                 }
             }
             Box(
-                Modifier.clip(RoundedCornerShape(12.dp)).background(if (ui.busy) GfColor.Hairline12 else GfColor.Lime)
+                Modifier.clip(RoundedCornerShape(12.dp)).background(if (ui.busy) GfColor.Hairline12 else GfColor.Accent)
                     .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !ui.busy) { vm.syncNow() }
                     .padding(horizontal = 16.dp, vertical = 10.dp),
             ) {
@@ -383,7 +383,7 @@ private fun GfTextField(value: String, onValueChange: (String) -> Unit, placehol
             value = value, onValueChange = onValueChange,
             singleLine = true,
             textStyle = TextStyle(color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.5.sp),
-            cursorBrush = androidx.compose.ui.graphics.SolidColor(GfColor.Lime),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(GfColor.Accent),
             visualTransformation = if (masked) PasswordVisualTransformation() else VisualTransformation.None,
             modifier = Modifier.fillMaxWidth(),
         )

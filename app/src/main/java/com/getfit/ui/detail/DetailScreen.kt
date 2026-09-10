@@ -137,13 +137,13 @@ fun DetailScreen(vm: AppViewModel, id: String) {
                     val pct = targetPct(cur, target.start, target.target)
                     val remain = (target.target - cur).coerceAtLeast(0.0).let { Math.round(it * 10) / 10.0 }
                     val days = targetDaysLeft(target.startDMs, target.weeks, now).coerceAtLeast(0)
-                    Column(Modifier.padding(top = 10.dp).clip(RoundedCornerShape(16.dp)).background(Color(0x12CBF25C)).border(1.dp, Color(0x29CBF25C), RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 14.dp)) {
+                    Column(Modifier.padding(top = 10.dp).clip(RoundedCornerShape(16.dp)).background(Color(0x120B7BF7)).border(1.dp, Color(0x290B7BF7), RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 14.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                Icon(msIcon("flag"), null, tint = GfColor.Lime, modifier = Modifier.size(18.dp))
+                                Icon(msIcon("flag"), null, tint = GfColor.Accent, modifier = Modifier.size(18.dp))
                                 Text("Target ${if (bw) "${target.target.roundToInt()} reps" else "${Units.fmtDisplay(target.target, units)} $units"}", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.5.sp)
                             }
-                            Text("${(pct * 100).roundToInt()}%", color = GfColor.Lime, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 13.sp)
+                            Text("${(pct * 100).roundToInt()}%", color = GfColor.Accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 13.sp)
                         }
                         ProgressBar(pct.toFloat(), Modifier.padding(top = 10.dp))
                         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -155,13 +155,13 @@ fun DetailScreen(vm: AppViewModel, id: String) {
                     val ts = remember { MutableInteractionSource() }
                     Row(
                         Modifier.padding(top = 10.dp).fillMaxWidth().height(48.dp).pressScale(ts, 0.98f)
-                            .clip(RoundedCornerShape(14.dp)).border(1.5.dp, Color(0x66CBF25C), RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(14.dp)).border(1.5.dp, Color(0x660B7BF7), RoundedCornerShape(14.dp))
                             .clickable(ts, indication = null) { vm.openGoal(id) },
                         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(msIcon("flag"), null, tint = GfColor.Lime, modifier = Modifier.size(20.dp))
+                        Icon(msIcon("flag"), null, tint = GfColor.Accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Set a target", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.sp)
+                        Text("Set a target", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.sp)
                     }
                 }
 
@@ -170,8 +170,8 @@ fun DetailScreen(vm: AppViewModel, id: String) {
                 Text("How to perform", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp, modifier = Modifier.padding(top = 24.dp, bottom = 12.dp))
                 cues.forEachIndexed { i, c ->
                     Row(Modifier.padding(bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                        Box(Modifier.size(26.dp).clip(RoundedCornerShape(999.dp)).background(GfColor.LimeFill12), contentAlignment = Alignment.Center) {
-                            Text("${i + 1}", color = GfColor.Lime, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 13.sp)
+                        Box(Modifier.size(26.dp).clip(RoundedCornerShape(999.dp)).background(GfColor.AccentFill12), contentAlignment = Alignment.Center) {
+                            Text("${i + 1}", color = GfColor.Accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 13.sp)
                         }
                         Text(c, color = GfColor.TextCue, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 14.sp, lineHeight = 21.sp)
                     }
@@ -190,13 +190,13 @@ fun DetailScreen(vm: AppViewModel, id: String) {
                 Modifier.weight(1f).height(54.dp).pressScale(addI, 0.97f).clip(RoundedCornerShape(16.dp)).background(GfColor.SurfaceElevated).border(1.dp, GfColor.Hairline08, RoundedCornerShape(16.dp)).clickable(addI, indication = null) { vm.addToPlan(id) },
                 horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(msIcon(if (inPlan) "check" else "add"), null, tint = GfColor.Lime, modifier = Modifier.size(22.dp))
+                Icon(msIcon(if (inPlan) "check" else "add"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(if (inPlan) "In workout" else "Add", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.5.sp)
             }
             val startI = remember { MutableInteractionSource() }
             Row(
-                Modifier.weight(1f).height(54.dp).pressScale(startI, 0.97f).clip(RoundedCornerShape(16.dp)).background(GfColor.Lime).clickable(startI, indication = null) { vm.startSingle(id, ex.reps) },
+                Modifier.weight(1f).height(54.dp).pressScale(startI, 0.97f).clip(RoundedCornerShape(16.dp)).background(GfColor.Accent).clickable(startI, indication = null) { vm.startSingle(id, ex.reps) },
                 horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(msIcon("play_arrow"), null, tint = GfColor.OnAccent, modifier = Modifier.size(22.dp))
@@ -220,9 +220,9 @@ private fun DemoStage(gifUrl: String, muscle: String, onClose: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.size(210.dp).rotate(angle)) {
-            drawCircle(color = Color(0x29CBF25C), radius = size.minDimension / 2, style = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 14f))))
+            drawCircle(color = Color(0x290B7BF7), radius = size.minDimension / 2, style = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 14f))))
         }
-        Box(Modifier.size(150.dp).background(Brush.radialGradient(listOf(GfColor.Lime.copy(alpha = glow), Color.Transparent)), RoundedCornerShape(999.dp)))
+        Box(Modifier.size(150.dp).background(Brush.radialGradient(listOf(GfColor.Accent.copy(alpha = glow), Color.Transparent)), RoundedCornerShape(999.dp)))
 
         // Demo slot: loads {MEDIA_BASE}{media_id}.gif — shimmer while loading, animated-icon
         // fallback on empty/failed load (e.g. the CDN being down), the GIF once it succeeds.
@@ -241,7 +241,7 @@ private fun DemoStage(gifUrl: String, muscle: String, onClose: () -> Unit) {
                     Modifier.fillMaxSize().background(GfColor.Surface).border(1.dp, GfColor.Hairline08, RoundedCornerShape(22.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(MuscleIcon.of(muscle), null, tint = GfColor.Lime, modifier = Modifier.offset(y = bob.dp).size(72.dp))
+                    Icon(MuscleIcon.of(muscle), null, tint = GfColor.Accent, modifier = Modifier.offset(y = bob.dp).size(72.dp))
                 }
             }
         }
@@ -249,7 +249,7 @@ private fun DemoStage(gifUrl: String, muscle: String, onClose: () -> Unit) {
         // back button
         val back = remember { MutableInteractionSource() }
         Box(
-            Modifier.align(Alignment.TopStart).padding(start = 20.dp, top = 14.dp).size(44.dp).pressScale(back, 0.9f).clip(RoundedCornerShape(999.dp)).background(Color(0x99171210)).border(1.dp, GfColor.Hairline10, RoundedCornerShape(999.dp)).clickable(back, indication = null, onClick = onClose),
+            Modifier.align(Alignment.TopStart).padding(start = 20.dp, top = 14.dp).size(44.dp).pressScale(back, 0.9f).clip(RoundedCornerShape(999.dp)).background(Color(0x99000000)).border(1.dp, GfColor.Hairline10, RoundedCornerShape(999.dp)).clickable(back, indication = null, onClick = onClose),
             contentAlignment = Alignment.Center,
         ) {
             Icon(msIcon("arrow_back"), null, tint = GfColor.Text, modifier = Modifier.size(24.dp))
@@ -263,7 +263,7 @@ private fun InfoChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text
         Modifier.clip(Pill).background(GfColor.Surface).border(1.dp, GfColor.Hairline08, Pill).padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Icon(icon, null, tint = GfColor.Lime, modifier = Modifier.size(16.dp))
+        Icon(icon, null, tint = GfColor.Accent, modifier = Modifier.size(16.dp))
         Text(text, color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -288,9 +288,9 @@ private fun StatBox(label: String, main: String, sub: String, modifier: Modifier
 @Composable
 private fun TrendCard(trend: com.getfit.domain.TrendResult) {
     val (color, fill, label, icon) = when (trend.verdict) {
-        TrendVerdict.IMPROVING -> TrendStyle(GfColor.Lime, GfColor.LimeFill12, "Improving", "trending_up")
-        TrendVerdict.PLATEAUED -> TrendStyle(GfColor.Amber, GfColor.AmberFill13, "Plateaued", "monitoring")
-        TrendVerdict.DECLINING -> TrendStyle(GfColor.Coral, Color(0x21F0774E), "Declining", "warning")
+        TrendVerdict.IMPROVING -> TrendStyle(GfColor.TrendUp, GfColor.TrendUpFill, "Improving", "trending_up")
+        TrendVerdict.PLATEAUED -> TrendStyle(GfColor.TrendFlat, GfColor.TrendFlatFill, "Plateaued", "monitoring")
+        TrendVerdict.DECLINING -> TrendStyle(GfColor.TrendDown, GfColor.TrendDownFill, "Declining", "warning")
         TrendVerdict.INSUFFICIENT_DATA -> TrendStyle(GfColor.TextDim, GfColor.Hairline08, "Not enough data", "info")
     }
     Column(
@@ -310,7 +310,7 @@ private data class TrendStyle(val color: Color, val fill: Color, val label: Stri
 @Composable
 private fun ProgressBar(pct: Float, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().height(7.dp).clip(Pill).background(GfColor.Hairline10)) {
-        Box(Modifier.fillMaxWidth(pct.coerceIn(0f, 1f)).height(7.dp).clip(Pill).background(GfColor.Lime))
+        Box(Modifier.fillMaxWidth(pct.coerceIn(0f, 1f)).height(7.dp).clip(Pill).background(GfColor.Accent))
     }
 }
 

@@ -7,7 +7,7 @@
          45-degree cut ends, evoking a forged/struck edge rather than a plain
          typographic letter. Keep in sync with core/ui/LogoMark.kt. -->
     <path
-        android:fillColor="#17120D"
+        android:fillColor="#FFFFFF"
         android:pathData="
             M34,28 L48,28 L48,80 L40,80 L34,74 Z
             M34,28 L78,28 L70,40 L34,40 Z

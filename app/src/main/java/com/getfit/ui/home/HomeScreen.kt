@@ -97,12 +97,12 @@ fun HomeScreen(vm: AppViewModel) {
             Box(
                 Modifier.size(46.dp).pressScale(gear)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(Brush.linearGradient(listOf(GfColor.SurfaceElevated, Color(0xFF20180F))))
+                    .background(Brush.linearGradient(listOf(GfColor.SurfaceElevated, Color(0xFF1A1A1A))))
                     .border(1.dp, GfColor.Hairline10, RoundedCornerShape(999.dp))
                     .clickable(gear, indication = null) { vm.openSettings() },
                 contentAlignment = Alignment.Center,
             ) {
-                Text("AR", color = GfColor.Lime, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
+                Text("AR", color = GfColor.Accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
             }
         }
 
@@ -129,7 +129,7 @@ fun HomeScreen(vm: AppViewModel) {
         ) {
             Text("Browse by muscle", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
             Text(
-                "See all", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
+                "See all", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
                 modifier = Modifier.clickable { vm.goExercises() },
             )
         }
@@ -154,7 +154,7 @@ private fun HeroCard(intensity: String, rpe: String, exCount: Int, sets: Int, es
                     Text("TODAY · READY", color = GfColor.OnAccentSub, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 12.sp)
                 }
                 Box(
-                    Modifier.clip(Pill).background(Color(0x24171210)).padding(horizontal = 10.dp, vertical = 5.dp),
+                    Modifier.clip(Pill).background(Color(0x24000000)).padding(horizontal = 10.dp, vertical = 5.dp),
                 ) {
                     Text("$intensity · $rpe", color = GfColor.OnAccent, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 11.sp)
                 }
@@ -173,7 +173,7 @@ private fun HeroCard(intensity: String, rpe: String, exCount: Int, sets: Int, es
                     .clickable(start, indication = null, onClick = onStart),
                 horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(msIcon("play_arrow"), null, tint = GfColor.Lime, modifier = Modifier.size(22.dp))
+                Icon(msIcon("play_arrow"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Start workout", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
             }
@@ -210,13 +210,13 @@ private fun StreakStrip(streak: Int, dayHit: BooleanArray, todayIdx: Int) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     Box(
                         Modifier.size(30.dp).clip(RoundedCornerShape(999.dp))
-                            .background(if (done) GfColor.Lime else if (today) GfColor.LimeFill12 else GfColor.Surface)
-                            .border(1.5.dp, if (today || done) GfColor.Lime else GfColor.Hairline08, RoundedCornerShape(999.dp)),
+                            .background(if (done) GfColor.Accent else if (today) GfColor.AccentFill12 else GfColor.Surface)
+                            .border(1.5.dp, if (today || done) GfColor.Accent else GfColor.Hairline08, RoundedCornerShape(999.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (done) Icon(msIcon("check"), null, tint = GfColor.OnAccent, modifier = Modifier.size(16.dp))
                     }
-                    Text(d, color = if (today) GfColor.Lime else GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 10.5.sp)
+                    Text(d, color = if (today) GfColor.Accent else GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 10.5.sp)
                 }
             }
         }
@@ -233,7 +233,7 @@ private fun CategoryCard(name: String, count: Int, onClick: () -> Unit) {
             .clickable(interaction, indication = null, onClick = onClick).padding(14.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Icon(com.getfit.core.ui.MuscleIcon.of(name), null, tint = GfColor.Lime, modifier = Modifier.size(24.dp))
+        Icon(com.getfit.core.ui.MuscleIcon.of(name), null, tint = GfColor.Accent, modifier = Modifier.size(24.dp))
         Column {
             Text(name, color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.sp)
             Text("$count moves", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.sp)

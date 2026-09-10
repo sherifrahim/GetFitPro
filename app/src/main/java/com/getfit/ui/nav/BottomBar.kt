@@ -70,7 +70,7 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, modifier: Modifier =
                     .offset(x = indicatorX)
                     .size(width = pillW, height = pillH)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(GfColor.LimeFill15),
+                    .background(GfColor.AccentFill15),
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 TABS.forEach { tab ->
@@ -86,13 +86,13 @@ fun BottomBar(selected: String, onSelect: (String) -> Unit, modifier: Modifier =
                         Box(Modifier.height(pillH), contentAlignment = Alignment.Center) {
                             Icon(
                                 tab.icon, contentDescription = tab.label,
-                                tint = if (active) GfColor.Lime else GfColor.TextFaint,
+                                tint = if (active) GfColor.Accent else GfColor.TextFaint,
                                 modifier = Modifier.size(24.dp),
                             )
                         }
                         Text(
                             tab.label,
-                            color = if (active) GfColor.Lime else GfColor.TextFaint,
+                            color = if (active) GfColor.Accent else GfColor.TextFaint,
                             fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 10.5.sp,
                             modifier = Modifier.padding(top = 3.dp),
                         )

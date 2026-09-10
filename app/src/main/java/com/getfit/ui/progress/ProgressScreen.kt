@@ -113,7 +113,7 @@ fun ProgressScreen(vm: AppViewModel) {
         ) {
             Row(Modifier.fillMaxWidth().padding(bottom = 18.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Volume this week", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
-                Text("${Units.volDisplay(week.totalVolume, units)} $units", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
+                Text("${Units.volDisplay(week.totalVolume, units)} $units", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
             }
             val todayIdx = (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) + 5) % 7
             val maxV = (week.dayVolume.maxOrNull() ?: 0).coerceAtLeast(1)
@@ -127,10 +127,10 @@ fun ProgressScreen(vm: AppViewModel) {
                         Box(Modifier.weight(1f), contentAlignment = Alignment.BottomCenter) {
                             Box(
                                 Modifier.fillMaxWidth().fillMaxHeight(h.coerceIn(if (week.dayVolume[i] == 0) 0f else 0.05f, 1f)).clip(RoundedCornerShape(7.dp))
-                                    .background(if (isToday) GfColor.Lime else if (week.dayVolume[i] == 0) GfColor.Hairline06 else GfColor.Lime.copy(alpha = 0.35f)),
+                                    .background(if (isToday) GfColor.Accent else if (week.dayVolume[i] == 0) GfColor.Hairline06 else GfColor.Accent.copy(alpha = 0.35f)),
                             )
                         }
-                        Text(d, color = if (isToday) GfColor.Lime else GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 10.5.sp, modifier = Modifier.padding(top = 8.dp))
+                        Text(d, color = if (isToday) GfColor.Accent else GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 10.5.sp, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
             }
@@ -140,11 +140,11 @@ fun ProgressScreen(vm: AppViewModel) {
         Column(Modifier.padding(top = 14.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ProgStat("local_fire_department", GfColor.Amber, "Streak", "$streak ${if (streak == 1) "day" else "days"}", Modifier.weight(1f))
-                ProgStat("exercise", GfColor.Lime, "Total workouts", data.sessions.size.toString(), Modifier.weight(1f))
+                ProgStat("exercise", GfColor.Accent, "Total workouts", data.sessions.size.toString(), Modifier.weight(1f))
             }
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ProgStat("monitoring", GfColor.Lime, "Total volume", "${fmtVol(Units.volDisplay(totalVol, units))} $units", Modifier.weight(1f))
+                ProgStat("monitoring", GfColor.Accent, "Total volume", "${fmtVol(Units.volDisplay(totalVol, units))} $units", Modifier.weight(1f))
                 ProgStat("emoji_events", GfColor.Amber, "PRs this month", prMonth.toString(), Modifier.weight(1f))
             }
         }
@@ -155,7 +155,7 @@ fun ProgressScreen(vm: AppViewModel) {
                 .clickable(remember { MutableInteractionSource() }, indication = null) { vm.openAiReview() }.padding(18.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color(0x24171210)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color(0x24000000)), contentAlignment = Alignment.Center) {
                 Icon(msIcon("smart_display"), null, tint = GfColor.OnAccent, modifier = Modifier.size(22.dp))
             }
             Column(Modifier.weight(1f)) {
@@ -195,19 +195,19 @@ fun ProgressScreen(vm: AppViewModel) {
         Row(Modifier.fillMaxWidth().padding(top = 26.dp, bottom = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Goals & targets", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null) { vm.openNewGoal() }) {
-                Icon(msIcon("add"), null, tint = GfColor.Lime, modifier = Modifier.size(18.dp))
-                Text("New goal", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
+                Icon(msIcon("add"), null, tint = GfColor.Accent, modifier = Modifier.size(18.dp))
+                Text("New goal", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
             }
         }
         val targets = data.targets.filter { data.exercise(it.exId) != null }
         if (targets.isEmpty()) {
             Row(
-                Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(16.dp)).border(1.5.dp, Color(0x66CBF25C), RoundedCornerShape(16.dp)).clickable(remember { MutableInteractionSource() }, indication = null) { vm.openNewGoal() },
+                Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(16.dp)).border(1.5.dp, Color(0x660B7BF7), RoundedCornerShape(16.dp)).clickable(remember { MutableInteractionSource() }, indication = null) { vm.openNewGoal() },
                 horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(msIcon("flag"), null, tint = GfColor.Lime, modifier = Modifier.size(20.dp))
+                Icon(msIcon("flag"), null, tint = GfColor.Accent, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Set your first target", color = GfColor.Lime, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.sp)
+                Text("Set your first target", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.sp)
             }
         } else {
             targets.forEach { t ->
@@ -227,14 +227,14 @@ fun ProgressScreen(vm: AppViewModel) {
                     Row(Modifier.padding(top = 9.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                         Text(if (bw) "${cur.roundToInt()} reps" else "${Units.fmtDisplay(cur, units)} $units", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 21.sp)
                         Icon(msIcon("arrow_forward"), null, tint = GfColor.TextFaint, modifier = Modifier.size(16.dp).padding(bottom = 3.dp))
-                        Text(if (bw) "${t.target.roundToInt()} reps" else "${Units.fmtDisplay(t.target, units)} $units", color = GfColor.Lime, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
+                        Text(if (bw) "${t.target.roundToInt()} reps" else "${Units.fmtDisplay(t.target, units)} $units", color = GfColor.Accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
                     }
                     Box(Modifier.padding(top = 11.dp).fillMaxWidth().height(7.dp).clip(RoundedCornerShape(999.dp)).background(GfColor.Hairline10)) {
                         val w by animateFloatAsState(if (nav.charted) pct.toFloat() else 0f, tween(1000), label = "tgt")
-                        Box(Modifier.fillMaxWidth(w).height(7.dp).clip(RoundedCornerShape(999.dp)).background(GfColor.Lime))
+                        Box(Modifier.fillMaxWidth(w).height(7.dp).clip(RoundedCornerShape(999.dp)).background(GfColor.Accent))
                     }
                     Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(if (done) "Reached — nice!" else "+${if (bw) remain.roundToInt().toString() else Units.fmtDisplay(remain, units)} ${if (bw) "reps" else units} to go", color = if (done) GfColor.Lime else GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 11.5.sp)
+                        Text(if (done) "Reached — nice!" else "+${if (bw) remain.roundToInt().toString() else Units.fmtDisplay(remain, units)} ${if (bw) "reps" else units} to go", color = if (done) GfColor.Accent else GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 11.5.sp)
                         Text(if (days <= 0) "Due now" else "${days}d left", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 11.5.sp)
                     }
                 }
@@ -258,8 +258,8 @@ fun ProgressScreen(vm: AppViewModel) {
                     Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(18.dp)).background(GfColor.Surface).border(1.dp, GfColor.Hairline06, RoundedCornerShape(18.dp)).padding(13.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp),
                 ) {
-                    Box(Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)).background(GfColor.LimeFill12), contentAlignment = Alignment.Center) {
-                        Icon(msIcon("check_circle"), null, tint = GfColor.Lime, modifier = Modifier.size(22.dp))
+                    Box(Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)).background(GfColor.AccentFill12), contentAlignment = Alignment.Center) {
+                        Icon(msIcon("check_circle"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
                     }
                     Column(Modifier.weight(1f)) {
                         Text(h.name, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W600, fontSize = 14.5.sp)

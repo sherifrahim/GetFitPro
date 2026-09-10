@@ -35,7 +35,7 @@ fun Stepper(
     onInc: () -> Unit,
     modifier: Modifier = Modifier,
     iconSize: Dp = 30.dp,
-    tint: Color = GfColor.Lime,
+    tint: Color = GfColor.Accent,
     content: @Composable () -> Unit,
 ) {
     Row(
@@ -105,7 +105,7 @@ private fun RowScope.SegmentedCell(
             .weight(1f)
             .height(height)
             .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) GfColor.Lime else unselectedBg)
+            .background(if (selected) GfColor.Accent else unselectedBg)
             .then(
                 if (selected) Modifier
                 else Modifier.border(BorderStroke(1.dp, GfColor.Hairline08), RoundedCornerShape(12.dp)),

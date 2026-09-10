@@ -139,11 +139,14 @@ object Curated {
     data class OnboardSlide(val icon: String, val iconArgb: Long, val glowArgb: Long, val title: String, val body: String)
     val ONBOARD = listOf(
         // Copy avoids promising animated demos until MEDIA_BASE is wired to a GIF host.
-        OnboardSlide("exercise", 0xFFCBF25C, 0x59CBF25C, "1,324 exercises, fully detailed",
+        // All three slides now carry the single accent blue; the old per-slide lime/amber/mint trio
+        // was brand colour, not meaning. Count matches the shipped dataset (1,342) — it read 1,324
+        // (the planned figure) while the Exercises screen derived the real one, so the two disagreed.
+        OnboardSlide("exercise", 0xFF0B7BF7, 0x590B7BF7, "1,342 exercises, fully detailed",
             "Browse a huge library with step-by-step cues and filters for every muscle and piece of kit."),
-        OnboardSlide("monitoring", 0xFFF3B24A, 0x4CF3B24A, "Log every set, chase every PR",
+        OnboardSlide("monitoring", 0xFF0B7BF7, 0x4C0B7BF7, "Log every set, chase every PR",
             "Track weight and reps as you train. Forge spots personal records the moment you hit them."),
-        OnboardSlide("flag", 0xFF86D6B4, 0x4C86D6B4, "Set targets, watch them close",
+        OnboardSlide("flag", 0xFF0B7BF7, 0x4C0B7BF7, "Set targets, watch them close",
             "Pick a goal weight and a deadline, then follow your progress. Everything stays private, on your device."),
     )
 

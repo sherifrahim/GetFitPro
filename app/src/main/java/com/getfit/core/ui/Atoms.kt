@@ -59,7 +59,7 @@ fun Pill(
     Box(
         modifier = modifier
             .clip(PillShape)
-            .background(if (selected) GfColor.Lime else GfColor.Surface)
+            .background(if (selected) GfColor.Accent else GfColor.Surface)
             .then(
                 if (selected) Modifier
                 else Modifier.border(BorderStroke(1.dp, GfColor.Hairline08), PillShape),
@@ -83,7 +83,7 @@ fun StatCard(
     value: String,
     label: String,
     modifier: Modifier = Modifier,
-    iconTint: Color = GfColor.Lime,
+    iconTint: Color = GfColor.Accent,
 ) {
     Column(
         modifier = modifier

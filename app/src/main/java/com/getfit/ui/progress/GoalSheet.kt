@@ -58,7 +58,7 @@ fun GoalSheet(vm: AppViewModel) {
     val canSave = nav.goalTarget > cur
 
     Box(
-        Modifier.fillMaxSize().background(Color(0x99060403)).clickable(remember { MutableInteractionSource() }, indication = null) { vm.closeGoal() },
+        Modifier.fillMaxSize().background(Color(0x99000000)).clickable(remember { MutableInteractionSource() }, indication = null) { vm.closeGoal() },
         contentAlignment = Alignment.BottomCenter,
     ) {
         Column(
@@ -77,7 +77,7 @@ fun GoalSheet(vm: AppViewModel) {
                 Curated.GOAL_EX.forEach { id ->
                     val sel = id == nav.goalEx
                     Box(
-                        Modifier.clip(Pill).background(if (sel) GfColor.Lime else GfColor.Surface).border(1.dp, if (sel) GfColor.Lime else GfColor.Hairline08, Pill)
+                        Modifier.clip(Pill).background(if (sel) GfColor.Accent else GfColor.Surface).border(1.dp, if (sel) GfColor.Accent else GfColor.Hairline08, Pill)
                             .clickable(remember { MutableInteractionSource() }, indication = null) { vm.selectGoalEx(id) }.padding(horizontal = 14.dp, vertical = 9.dp),
                     ) {
                         Text(data.exercise(id)?.name ?: id, color = if (sel) GfColor.OnAccent else GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.sp)
@@ -90,12 +90,12 @@ fun GoalSheet(vm: AppViewModel) {
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(GfColor.Surface).border(1.dp, GfColor.Hairline08, RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(msIcon("remove_circle"), null, tint = GfColor.Lime, modifier = Modifier.size(32.dp).clickable(remember { MutableInteractionSource() }, indication = null) { vm.adjustGoal(-1) })
+                Icon(msIcon("remove_circle"), null, tint = GfColor.Accent, modifier = Modifier.size(32.dp).clickable(remember { MutableInteractionSource() }, indication = null) { vm.adjustGoal(-1) })
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(fmtW(nav.goalTarget), color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 28.sp)
                     Text(" $unit", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.sp, modifier = Modifier.padding(bottom = 4.dp))
                 }
-                Icon(msIcon("add_circle"), null, tint = GfColor.Lime, modifier = Modifier.size(32.dp).clickable(remember { MutableInteractionSource() }, indication = null) { vm.adjustGoal(1) })
+                Icon(msIcon("add_circle"), null, tint = GfColor.Accent, modifier = Modifier.size(32.dp).clickable(remember { MutableInteractionSource() }, indication = null) { vm.adjustGoal(1) })
             }
 
             Spacer(Modifier.height(18.dp))
@@ -104,7 +104,7 @@ fun GoalSheet(vm: AppViewModel) {
                 listOf(4, 6, 8, 12).forEach { w ->
                     val sel = w == nav.goalWeeks
                     Box(
-                        Modifier.weight(1f).height(46.dp).clip(RoundedCornerShape(14.dp)).background(if (sel) GfColor.Lime else GfColor.Surface).border(1.dp, if (sel) GfColor.Lime else GfColor.Hairline08, RoundedCornerShape(14.dp))
+                        Modifier.weight(1f).height(46.dp).clip(RoundedCornerShape(14.dp)).background(if (sel) GfColor.Accent else GfColor.Surface).border(1.dp, if (sel) GfColor.Accent else GfColor.Hairline08, RoundedCornerShape(14.dp))
                             .clickable(remember { MutableInteractionSource() }, indication = null) { vm.setGoalWeeks(w) },
                         contentAlignment = Alignment.Center,
                     ) {
@@ -114,7 +114,7 @@ fun GoalSheet(vm: AppViewModel) {
             }
 
             Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Icon(msIcon("trending_up"), null, tint = GfColor.Lime, modifier = Modifier.size(18.dp))
+                Icon(msIcon("trending_up"), null, tint = GfColor.Accent, modifier = Modifier.size(18.dp))
                 Text(
                     if (canSave) "+${if (bw) ceil(per).toInt().toString() + " reps" else fmtW(Math.round(per * 10) / 10.0) + " " + settings.units} / week · from ${if (bw) cur.toInt() else fmtW(cur)} $unit now"
                     else "Pick a target above your best",
@@ -123,7 +123,7 @@ fun GoalSheet(vm: AppViewModel) {
             }
 
             Box(
-                Modifier.padding(top = 18.dp).fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).background(if (canSave) GfColor.Lime else GfColor.SurfaceElevated)
+                Modifier.padding(top = 18.dp).fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).background(if (canSave) GfColor.Accent else GfColor.SurfaceElevated)
                     .clickable(remember { MutableInteractionSource() }, indication = null) { if (canSave) vm.saveGoal() },
                 contentAlignment = Alignment.Center,
             ) {

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="getfit_background">#17120D</color>
-    <color name="ic_launcher_background">#CBF25C</color>
+    <!-- Keep in step with core/theme/Tokens.kt. windowBackground is what paints before Compose
+         draws its first frame, so a mismatch here shows up as a coloured flash at cold start. -->
+    <color name="getfit_background">#000000</color>
+    <color name="ic_launcher_background">#0B7BF7</color>
 </resources>

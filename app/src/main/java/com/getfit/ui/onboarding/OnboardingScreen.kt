@@ -67,11 +67,11 @@ fun OnboardingScreen(vm: com.getfit.ui.AppViewModel) {
             Row(Modifier.fillMaxWidth().padding(bottom = 28.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 repeat(3) { i ->
                     val wDot by animateDpAsState(if (i == nav.obSlide) 26.dp else 8.dp, label = "dot")
-                    Box(Modifier.padding(horizontal = 4.dp).size(width = wDot, height = 8.dp).clip(RoundedCornerShape(999.dp)).background(if (i == nav.obSlide) GfColor.Lime else GfColor.Text.copy(alpha = 0.18f)))
+                    Box(Modifier.padding(horizontal = 4.dp).size(width = wDot, height = 8.dp).clip(RoundedCornerShape(999.dp)).background(if (i == nav.obSlide) GfColor.Accent else GfColor.Text.copy(alpha = 0.18f)))
                 }
             }
             Box(
-                Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(18.dp)).background(GfColor.Lime)
+                Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(18.dp)).background(GfColor.Accent)
                     .clickable(remember { MutableInteractionSource() }, indication = null) { vm.obNext() },
                 contentAlignment = Alignment.Center,
             ) {

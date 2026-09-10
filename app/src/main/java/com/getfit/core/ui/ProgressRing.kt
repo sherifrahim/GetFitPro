@@ -26,8 +26,8 @@ fun ProgressRing(
     modifier: Modifier = Modifier,
     size: Dp = 104.dp,
     strokeWidth: Dp = 10.dp,
-    color: Color = Color(0xFFCBF25C),
-    trackColor: Color = Color(0x17F6F0E6),
+    color: Color = Color(0xFF0B7BF7),
+    trackColor: Color = Color(0x17FFFFFF),
     animationSpec: AnimationSpec<Float> = tween(1100),
     content: @Composable () -> Unit = {},
 ) {
