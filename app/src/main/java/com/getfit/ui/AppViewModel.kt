@@ -13,6 +13,7 @@ import com.getfit.data.ai.PROVIDER_COMPAT
 import com.getfit.data.ai.aiReviewSystemPrompt
 import com.getfit.data.ai.textBlock
 import com.getfit.data.security.KeySlot
+import com.getfit.data.sync.SyncOutcome
 import com.getfit.data.ai.BodyGoal
 import com.getfit.data.ai.ImageEncoder
 import com.getfit.data.ai.PhotoView
@@ -107,9 +108,12 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     private val _importExport = MutableStateFlow(ImportExportUiState())
     val importExport: StateFlow<ImportExportUiState> = _importExport.asStateFlow()
 
-    private val _syncBusy = MutableStateFlow(false)
-    val syncUi: StateFlow<SyncUiState> = combine(syncRepo.state, _syncBusy) { s, busy -> SyncUiState(s, busy) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SyncUiState())
+    // Transient bits of the sync UI (busy, confirm gate, last message) live here; the persisted
+    // part comes from SyncRepo.state and the token flag from SecureKeyStore.
+    private val _syncTransient = MutableStateFlow(SyncUiState())
+    val syncUi: StateFlow<SyncUiState> = combine(syncRepo.state, syncRepo.hasToken, _syncTransient) { s, tok, t ->
+        t.copy(state = s, hasToken = tok)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SyncUiState())
 
     private var toastJob: Job? = null
     private var clearJob: Job? = null
@@ -385,6 +389,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
             }
             when (val outcome = importExportRepo.importCsv(text, data.value.exercises)) {
                 is ImportOutcome.Success -> {
+                    syncRepo.noteChange()
                     val s = outcome.summary
                     val msg = buildString {
                         append("Imported ${s.setsImported} sets across ${s.sessionsImported} sessions from ${s.format.label}")
@@ -491,6 +496,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     private fun applyRestore(outcome: RestoreOutcome) {
         when (outcome) {
             is RestoreOutcome.Success -> {
+                syncRepo.noteChange()
                 _backup.update {
                     it.copy(busy = false, lastResult = "Restored ${outcome.info.records} records.", lastError = null)
                 }
@@ -501,15 +507,46 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    // ---- cloud sync (client-side groundwork; inert until a server URL is set) ----
+    // ---- cloud sync (snapshot sync against the user's own forge-sync server) ----
     fun setSyncServerUrl(url: String) = viewModelScope.launch { syncRepo.setServerUrl(url) }
+    fun setSyncToken(token: String) = viewModelScope.launch { syncRepo.setToken(token) }
+    fun clearSyncToken() = viewModelScope.launch { syncRepo.clearToken() }
+    fun setAutoSync(on: Boolean) = viewModelScope.launch { syncRepo.setAutoSync(on) }
 
-    fun syncNow() {
-        if (_syncBusy.value) return
-        _syncBusy.value = true
+    private fun syncBusy(block: suspend () -> String) {
+        if (_syncTransient.value.busy) return
+        _syncTransient.update { it.copy(busy = true, lastResult = null, confirmingRestore = false) }
         viewModelScope.launch {
-            syncRepo.syncNow()
-            _syncBusy.value = false
+            val msg = block()
+            _syncTransient.update { it.copy(busy = false, lastResult = msg) }
+        }
+    }
+
+    fun testSyncConnection(url: String) = syncBusy {
+        syncRepo.testConnection(url).fold(
+            onSuccess = { "Connected — the server is up." },
+            onFailure = { it.message ?: "Couldn't reach the server." },
+        )
+    }
+
+    fun syncNow() = syncBusy {
+        when (val r = syncRepo.syncNow()) {
+            is SyncOutcome.Uploaded -> if (r.unchanged) "Already up to date (version ${r.version})." else "Uploaded snapshot version ${r.version}."
+            is SyncOutcome.Failure -> r.message
+            SyncOutcome.NotConfigured -> "Set the server URL and token first."
+            is SyncOutcome.Restored -> "Restored version ${r.version}."
+        }
+    }
+
+    fun askCloudRestore() = _syncTransient.update { it.copy(confirmingRestore = true, lastResult = null) }
+    fun cancelCloudRestore() = _syncTransient.update { it.copy(confirmingRestore = false) }
+
+    fun restoreFromCloud() = syncBusy {
+        when (val r = syncRepo.restoreFromCloud()) {
+            is SyncOutcome.Restored -> { toast("Restored from cloud", "check_circle"); "Restored ${r.records} records (version ${r.version})." }
+            is SyncOutcome.Failure -> r.message
+            SyncOutcome.NotConfigured -> "Set the server URL and token first."
+            is SyncOutcome.Uploaded -> "Uploaded."
         }
     }
 

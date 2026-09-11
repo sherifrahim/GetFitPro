@@ -15,12 +15,10 @@ import java.util.UUID
 private val SYNC_STATE_KEY = stringPreferencesKey("syncState")
 
 /**
- * DataStore-backed sync outbox + config — the client-side groundwork for Oracle server sync.
- * Deliberately NOT a new Room table: this app's database has no migration path set up yet
- * (version 1, no Migration objects), so adding a table here without one would either crash on the
- * next launch or require a destructive-migration wipe of the user's real workout data — neither is
- * acceptable for what's still just scaffolding. A DataStore blob (same pattern as Settings/Plan/
- * Session in Prefs.kt) needs no schema migration at all.
+ * DataStore-backed sync state. A single JSON blob under one preference key (same pattern as
+ * Settings/Plan/Session in Prefs.kt) — no Room table, no schema migration. The old op-based
+ * outbox that used to live in this same key decodes with `ignoreUnknownKeys`, so an install that
+ * still has one simply drops it.
  */
 class SyncStore(private val ds: DataStore<Preferences>) {
     private val json = Json { ignoreUnknownKeys = true }
@@ -32,7 +30,7 @@ class SyncStore(private val ds: DataStore<Preferences>) {
     private suspend fun current(): SyncState = flow.first()
     private suspend fun save(state: SyncState) = ds.edit { it[SYNC_STATE_KEY] = json.encodeToString(state) }
 
-    /** Stable per-install id, generated once and reused for every sync call. */
+    /** Stable per-install id, generated once. Sent as X-Device-Id so the server can label versions. */
     suspend fun deviceId(): String {
         val s = current()
         if (s.deviceId.isNotBlank()) return s.deviceId
@@ -41,24 +39,10 @@ class SyncStore(private val ds: DataStore<Preferences>) {
         return id
     }
 
-    suspend fun setServerUrl(url: String) = save(current().copy(serverUrl = url.trim()))
-
-    suspend fun enqueue(entityType: String, entityId: String, op: String, payload: String) {
-        val s = current()
-        val next = SyncOp(
-            id = "op${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}",
-            entityType = entityType, entityId = entityId, op = op, payload = payload,
-            enqueuedAtMs = System.currentTimeMillis(),
-        )
-        // Cap the outbox so a long offline stretch can't grow it unboundedly.
-        save(s.copy(queue = (s.queue + next).takeLast(500)))
-    }
-
-    suspend fun dequeue(ids: Set<String>) {
-        val s = current()
-        save(s.copy(queue = s.queue.filterNot { it.id in ids }))
-    }
-
-    suspend fun markSynced(atMs: Long) = save(current().copy(lastSyncAtMs = atMs, lastError = null))
+    suspend fun setServerUrl(url: String) = save(current().copy(serverUrl = url.trim().trimEnd('/'), lastError = null))
+    suspend fun setAutoSync(on: Boolean) = save(current().copy(autoSync = on))
+    suspend fun markDirty() = save(current().copy(dirty = true))
+    suspend fun markSynced(version: Long, sha: String, atMs: Long) =
+        save(current().copy(dirty = false, remoteVersion = version, lastUploadedSha = sha, lastSyncAtMs = atMs, lastError = null))
     suspend fun markError(message: String) = save(current().copy(lastError = message))
 }

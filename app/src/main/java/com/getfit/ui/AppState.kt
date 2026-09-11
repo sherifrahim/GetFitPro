@@ -73,8 +73,15 @@ data class BackupUiState(
  *  in-progress flag that isn't itself persisted. */
 data class SyncUiState(
     val state: com.getfit.data.sync.SyncState = com.getfit.data.sync.SyncState(),
+    val hasToken: Boolean = false,
     val busy: Boolean = false,
-)
+    /** Restore-from-cloud replaces local data, so it is confirm-gated like the local restore. */
+    val confirmingRestore: Boolean = false,
+    /** Transient result of the last button press, shown under the buttons. */
+    val lastResult: String? = null,
+) {
+    val configured: Boolean get() = state.serverUrl.isNotBlank() && hasToken
+}
 
 const val TAB_HOME = "home"
 const val TAB_EXERCISES = "exercises"

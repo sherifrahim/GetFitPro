@@ -540,58 +540,125 @@ private fun ImportExportSection(vm: AppViewModel) {
     }
 }
 
+
+/**
+ * Cloud sync against the user's own forge-sync server (server/forge-sync/). Snapshot model: the
+ * app uploads its backup document after changes; restore pulls the newest one back and REPLACES
+ * local data, so it's confirm-gated exactly like the local restore above.
+ */
 @Composable
 private fun SyncSection(vm: AppViewModel) {
     val ui by vm.syncUi.collectAsState()
-    var urlInput by remember(ui.state.serverUrl) { mutableStateOf(ui.state.serverUrl) }
-    val connected = ui.state.serverUrl.isNotBlank()
+    val s = ui.state
+    var urlInput by remember(s.serverUrl) { mutableStateOf(s.serverUrl) }
+    var tokenInput by remember { mutableStateOf("") }
+    var reveal by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.Surface)
             .border(1.dp, GfColor.Hairline06, RoundedCornerShape(20.dp)).padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(msIcon(if (connected) "check_circle" else "info"), null, tint = if (connected) GfColor.Accent else GfColor.TextFaint, modifier = Modifier.size(16.dp))
+            Icon(
+                msIcon(if (ui.configured) "check_circle" else "info"), null,
+                tint = if (ui.configured) GfColor.Accent else GfColor.TextFaint, modifier = Modifier.size(16.dp),
+            )
             Text(
-                if (connected) "Server configured" else "No sync server set", color = GfColor.TextDim, fontFamily = Manrope,
-                fontWeight = FontWeight.W600, fontSize = 12.5.sp,
+                when {
+                    !ui.configured -> "Not set up"
+                    s.lastSyncAtMs > 0 -> "Last synced ${relativeTime(s.lastSyncAtMs)} · version ${s.remoteVersion}" + (if (s.dirty) " · changes pending" else "")
+                    else -> "Ready — nothing synced yet"
+                },
+                color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp,
             )
         }
         Text(
-            "Point this at your own Oracle-hosted sync endpoint to back up and sync your logs across " +
-                "devices. This is early groundwork — your data stays fully usable on-device whether or not it's set.",
+            "Keeps a copy of your data on your own server, so a new phone can pull it back. Your " +
+                "backup snapshot is uploaded after changes; nothing else is sent.",
             color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp,
-            lineHeight = 17.sp, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
+            lineHeight = 17.sp, modifier = Modifier.padding(top = 6.dp),
         )
 
-        GfTextField(value = urlInput, onValueChange = { urlInput = it }, placeholder = "https://your-server.example.com", masked = false)
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+        FieldLabel("SERVER")
+        GfTextField(value = urlInput, onValueChange = { urlInput = it }, placeholder = "https://forge.mooo.com", masked = false)
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Test", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
+                modifier = Modifier.padding(end = 18.dp).clickable(remember { MutableInteractionSource() }, indication = null, enabled = !ui.busy) { vm.testSyncConnection(urlInput) },
+            )
             Text(
                 "Save", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
                 modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null) { vm.setSyncServerUrl(urlInput) },
             )
         }
 
-        Divider()
+        FieldLabel("TOKEN")
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+            Icon(msIcon(if (ui.hasToken) "check_circle" else "info"), null, tint = if (ui.hasToken) GfColor.Accent else GfColor.TextFaint, modifier = Modifier.size(16.dp))
+            Text(if (ui.hasToken) "Token saved" else "No token set — it's in the server's .env as FORGE_SYNC_TOKEN", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, lineHeight = 17.sp)
+        }
+        GfTextField(value = tokenInput, onValueChange = { tokenInput = it }, placeholder = if (ui.hasToken) "New token (leave blank to keep current)" else "Paste token", masked = !reveal)
+        KeyActions(reveal = reveal, onReveal = { reveal = !reveal }, hasKey = ui.hasToken, onRemove = vm::clearSyncToken) {
+            if (tokenInput.isNotBlank()) { vm.setSyncToken(tokenInput); tokenInput = "" }
+        }
 
-        val pending = ui.state.queue.size
-        Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Auto-sync toggle
+        Row(
+            Modifier.fillMaxWidth().padding(top = 16.dp).clickable(remember { MutableInteractionSource() }, indication = null) { vm.setAutoSync(!s.autoSync) },
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
             Column(Modifier.weight(1f)) {
-                Text(
-                    if (pending == 0) "Up to date" else "$pending change${if (pending == 1) "" else "s"} queued",
-                    color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.5.sp,
-                )
-                when {
-                    ui.state.lastError != null -> Text(ui.state.lastError.orEmpty(), color = GfColor.Coral, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
-                    ui.state.lastSyncAtMs > 0 -> Text("Last synced ${relativeTime(ui.state.lastSyncAtMs)}", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
-                }
+                Text("Upload automatically", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.sp)
+                Text("About 20 seconds after you change something", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
             }
             Box(
-                Modifier.clip(RoundedCornerShape(12.dp)).background(if (ui.busy) GfColor.Hairline12 else GfColor.Accent)
-                    .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !ui.busy) { vm.syncNow() }
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                Modifier.width(44.dp).height(26.dp).clip(Pill).background(if (s.autoSync) GfColor.Accent else GfColor.Hairline12),
+                contentAlignment = if (s.autoSync) Alignment.CenterEnd else Alignment.CenterStart,
             ) {
-                Text(if (ui.busy) "Syncing…" else "Sync now", color = if (ui.busy) GfColor.TextDim else GfColor.OnAccent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.sp)
+                Box(Modifier.padding(3.dp).size(20.dp).clip(Pill).background(GfColor.Text))
+            }
+        }
+
+        // Actions
+        Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                Modifier.weight(1f).height(46.dp).clip(RoundedCornerShape(14.dp))
+                    .background(if (ui.configured && !ui.busy) GfColor.Accent else GfColor.Background)
+                    .clickable(remember { MutableInteractionSource() }, indication = null, enabled = ui.configured && !ui.busy) { vm.syncNow() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(if (ui.busy) "Working…" else "Sync now", color = if (ui.configured && !ui.busy) GfColor.OnAccent else GfColor.TextFaint, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 14.sp)
+            }
+            val confirming = ui.confirmingRestore
+            Box(
+                Modifier.weight(1f).height(46.dp).clip(RoundedCornerShape(14.dp))
+                    .background(if (confirming) Color(0x24F0774E) else GfColor.Background)
+                    .border(1.dp, if (confirming) Color(0x66F0774E) else GfColor.Hairline08, RoundedCornerShape(14.dp))
+                    .clickable(remember { MutableInteractionSource() }, indication = null, enabled = ui.configured && !ui.busy) {
+                        if (confirming) vm.restoreFromCloud() else vm.askCloudRestore()
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    if (confirming) "Tap again to replace" else "Restore from cloud",
+                    color = if (confirming) GfColor.Coral else if (ui.configured) GfColor.Text else GfColor.TextFaint,
+                    fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 13.sp,
+                )
+            }
+        }
+        if (ui.confirmingRestore) {
+            Text(
+                "Restoring replaces everything on this phone with the server's latest snapshot.",
+                color = GfColor.Coral, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+
+        val msg = ui.lastResult ?: s.lastError
+        if (msg != null && !ui.busy) {
+            val isError = ui.lastResult == null || !(msg.startsWith("Connected") || msg.startsWith("Uploaded") || msg.startsWith("Already") || msg.startsWith("Restored"))
+            Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(msIcon(if (isError) "warning" else "check_circle"), null, tint = if (isError) GfColor.Coral else GfColor.Accent, modifier = Modifier.size(16.dp))
+                Text(msg, color = if (isError) GfColor.Coral else GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, lineHeight = 17.sp)
             }
         }
     }

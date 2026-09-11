@@ -27,6 +27,8 @@ enum class KeySlot(internal val prefix: String) {
     ANTHROPIC("ai_api_key"),
     /** Key for the OpenAI-compatible provider (OpenAI, Groq, DeepSeek, OpenRouter, self-hosted, ...). */
     COMPAT("ai_compat_key"),
+    /** Bearer token for the user's own forge-sync server. */
+    SYNC("sync_token"),
 }
 
 private fun ctKey(slot: KeySlot) = stringPreferencesKey(slot.prefix + "_ct")
@@ -43,6 +45,7 @@ class SecureKeyStore(private val ds: DataStore<Preferences>) {
 
     val hasKey: Flow<Boolean> = ds.data.map { !it[ctKey(KeySlot.ANTHROPIC)].isNullOrEmpty() }
     val hasCompatKey: Flow<Boolean> = ds.data.map { !it[ctKey(KeySlot.COMPAT)].isNullOrEmpty() }
+    val hasSyncKey: Flow<Boolean> = ds.data.map { !it[ctKey(KeySlot.SYNC)].isNullOrEmpty() }
 
     suspend fun setApiKey(plaintext: String, slot: KeySlot = KeySlot.ANTHROPIC) {
         val trimmed = plaintext.trim()

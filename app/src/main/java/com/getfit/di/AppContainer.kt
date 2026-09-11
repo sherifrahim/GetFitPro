@@ -39,17 +39,20 @@ class AppContainer(val appContext: Context) {
     val sessionStore = com.getfit.data.prefs.SessionStore(appContext.dataStore)
     val secureKeyStore = SecureKeyStore(appContext.dataStore)
     val syncStore = SyncStore(appContext.dataStore)
-    val syncRepo = SyncRepo(syncStore)
+
+    val backupRepo = BackupRepo(
+        db.exerciseDao(), db.logDao(), db.sessionDao(), db.targetDao(),
+        settingsStore, planStore, appContext.filesDir,
+    )
+    // Sync uploads the backup document, so it depends on backupRepo; the data repos below depend
+    // on sync (to flag changes), hence this ordering.
+    val syncRepo = SyncRepo(syncStore, secureKeyStore, backupRepo, appScope)
 
     val exerciseRepo = ExerciseRepo(db.exerciseDao(), db.logDao())
     val workoutRepo = WorkoutRepo(planStore, db.exerciseDao(), db.logDao(), db.sessionDao(), syncRepo)
     val progressRepo = ProgressRepo(db.sessionDao(), db.targetDao(), syncRepo)
     val importExportRepo = ImportExportRepo(db.exerciseDao(), db.logDao(), db.sessionDao())
     val phoneWearSync = PhoneWearSync(appContext)
-    val backupRepo = BackupRepo(
-        db.exerciseDao(), db.logDao(), db.sessionDao(), db.targetDao(),
-        settingsStore, planStore, appContext.filesDir,
-    )
 
     /** Seed the library + demo data on first launch (idempotent). */
     fun seedOnFirstLaunch() {

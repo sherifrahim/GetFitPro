@@ -2,59 +2,94 @@ package com.getfit.data.sync
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
-sealed class SyncClientResult {
-    data class Success(val accepted: Int) : SyncClientResult()
-    data class Failure(val message: String) : SyncClientResult()
-}
+/** Any failure the user should see, with the message already phrased for a Settings card. */
+class SyncException(message: String) : Exception(message)
 
 /**
- * Talks to the (future) Oracle-hosted sync endpoint. Plain HttpURLConnection, matching
- * AiReviewClient — no networking library added for one more endpoint given this project's
- * zero-new-dependency approach this session. The endpoint shape (`POST {baseUrl}/sync/push` with a
- * `{device_id, ops}` JSON body) is a placeholder guess, not a confirmed contract — once the real
- * Oracle server details are shared, this is the one file that needs to change to match it.
+ * HTTP client for forge-sync (server/forge-sync/main.py). Plain HttpURLConnection, like every other
+ * network call in this app. Three endpoints, all tiny. HTTPS is required: Android blocks cleartext
+ * by default and this app does not opt out, so an http:// URL is refused up front with a message
+ * rather than failing with an opaque "Cleartext HTTP traffic not permitted".
  */
 object SyncClient {
     private val json = Json { ignoreUnknownKeys = true }
 
-    suspend fun push(baseUrl: String, deviceId: String, ops: List<SyncOp>): SyncClientResult =
-        withContext(Dispatchers.IO) {
-            if (baseUrl.isBlank()) return@withContext SyncClientResult.Failure("No sync server configured.")
-            if (ops.isEmpty()) return@withContext SyncClientResult.Success(0)
+    /** Unauthenticated liveness check. */
+    suspend fun health(baseUrl: String): Result<Unit> = request(baseUrl, "/v1/health", "GET", token = null).map { }
 
-            val body = json.encodeToString(SyncPushRequest(deviceId, ops))
-            var conn: HttpURLConnection? = null
-            try {
-                val url = baseUrl.trimEnd('/') + "/sync/push"
-                conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 15_000
-                    readTimeout = 30_000
+    suspend fun putSnapshot(baseUrl: String, token: String, deviceId: String, body: String): Result<SnapshotPutResponse> =
+        request(baseUrl, "/v1/snapshot", "PUT", token, body, extraHeaders = mapOf("X-Device-Id" to deviceId))
+            .mapCatching { (text, _) -> json.decodeFromString(SnapshotPutResponse.serializer(), text) }
+
+    suspend fun getLatest(baseUrl: String, token: String): Result<RemoteSnapshot> =
+        request(baseUrl, "/v1/snapshot/latest", "GET", token).mapCatching { (text, headers) ->
+            RemoteSnapshot(
+                body = text,
+                version = headers["x-snapshot-version"]?.toLongOrNull() ?: 0,
+                createdAt = headers["x-snapshot-created"].orEmpty(),
+                sha256 = headers["x-snapshot-sha256"].orEmpty(),
+            )
+        }
+
+    private suspend fun request(
+        baseUrl: String,
+        path: String,
+        method: String,
+        token: String?,
+        body: String? = null,
+        extraHeaders: Map<String, String> = emptyMap(),
+    ): Result<Pair<String, Map<String, String>>> = withContext(Dispatchers.IO) {
+        val base = baseUrl.trim().trimEnd('/')
+        if (base.isBlank()) return@withContext Result.failure(SyncException("No sync server set."))
+        if (!base.startsWith("https://", ignoreCase = true)) {
+            return@withContext Result.failure(SyncException("The server URL must start with https://."))
+        }
+        var conn: HttpURLConnection? = null
+        try {
+            conn = (URL(base + path).openConnection() as HttpURLConnection).apply {
+                requestMethod = method
+                connectTimeout = 15_000
+                readTimeout = 60_000
+                if (token != null) setRequestProperty("authorization", "Bearer $token")
+                extraHeaders.forEach { (k, v) -> setRequestProperty(k, v) }
+                if (body != null) {
                     doOutput = true
                     setRequestProperty("content-type", "application/json")
                 }
-                OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(body) }
-
-                val status = conn.responseCode
-                val stream = if (status in 200..299) conn.inputStream else conn.errorStream
-                val raw = stream?.bufferedReader(Charsets.UTF_8)?.readText().orEmpty()
-
-                if (status !in 200..299) {
-                    val parsedErr = runCatching { json.decodeFromString(SyncPushResponse.serializer(), raw) }.getOrNull()
-                    return@withContext SyncClientResult.Failure(parsedErr?.error ?: "Sync failed (HTTP $status).")
-                }
-                val parsed = runCatching { json.decodeFromString(SyncPushResponse.serializer(), raw) }.getOrNull()
-                SyncClientResult.Success(parsed?.accepted ?: ops.size)
-            } catch (e: Exception) {
-                SyncClientResult.Failure(e.message?.let { "Couldn't reach the sync server: $it" } ?: "Couldn't reach the sync server.")
-            } finally {
-                conn?.disconnect()
             }
+            if (body != null) OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(body) }
+
+            val status = conn.responseCode
+            val stream = if (status in 200..299) conn.inputStream else conn.errorStream
+            val text = stream?.bufferedReader(Charsets.UTF_8)?.readText().orEmpty()
+            if (status !in 200..299) {
+                val detail = runCatching { json.parseToJsonElement(text).jsonObject["detail"]?.jsonPrimitive?.content }.getOrNull()
+                val msg = when (status) {
+                    401 -> "The server rejected the token."
+                    404 -> if (path.endsWith("/latest")) "Nothing has been synced to this server yet." else "Not a forge-sync server (404)."
+                    413 -> "The snapshot is too large for the server."
+                    else -> detail ?: "Server error (HTTP $status)."
+                }
+                return@withContext Result.failure(SyncException(msg))
+            }
+            // Header names are case-insensitive; normalise so callers can look them up predictably.
+            val headers = conn.headerFields.entries
+                .filter { it.key != null }
+                .associate { it.key.lowercase() to it.value.firstOrNull().orEmpty() }
+            Result.success(text to headers)
+        } catch (e: SyncException) {
+            Result.failure(e)
+        } catch (e: Exception) {
+            Result.failure(SyncException("Couldn't reach the server: ${e.message ?: e.javaClass.simpleName}"))
+        } finally {
+            conn?.disconnect()
         }
+    }
 }

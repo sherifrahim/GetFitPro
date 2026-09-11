@@ -1,61 +1,40 @@
 package com.getfit.data.sync
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** One locally-made change waiting to be pushed to the sync server. Enqueued the moment the user's
- *  own data changes (a saved session, a new/removed target) — enqueueing itself never blocks or
- *  fails the local write it's attached to. */
-@Serializable
-data class SyncOp(
-    val id: String,
-    val entityType: String, // "session" | "target"
-    val entityId: String,
-    val op: String,         // "upsert" | "delete"
-    val payload: String,    // JSON snapshot of the entity at enqueue time (blank for deletes)
-    val enqueuedAtMs: Long,
-)
-
-/** Persisted sync configuration + outbox. serverUrl stays blank — and sync stays fully inert —
- *  until the user sets their Oracle endpoint in Settings. */
+/**
+ * Persisted cloud-sync state. The model is SNAPSHOT sync: whenever the user's data changes the app
+ * uploads its full backup document (the same "forge.backup" JSON the on-device backup writes) to
+ * the forge-sync server, which keeps the last N versions; restore pulls the newest one back. One
+ * user, whole snapshots, last-writer-wins — see server/forge-sync/main.py for the other half.
+ *
+ * The bearer token is NOT here; it lives in SecureKeyStore under KeySlot.SYNC.
+ */
 @Serializable
 data class SyncState(
     val serverUrl: String = "",
     val deviceId: String = "",
-    val queue: List<SyncOp> = emptyList(),
+    /** Auto-upload after changes (debounced). Off means only "Sync now" uploads. */
+    val autoSync: Boolean = true,
+    /** Something changed locally since the last successful upload. */
+    val dirty: Boolean = false,
     val lastSyncAtMs: Long = 0,
+    /** Server-assigned version of the last snapshot we uploaded or restored. */
+    val remoteVersion: Long = 0,
+    /** sha256 of the last uploaded body — lets a no-op upload be skipped without a round trip. */
+    val lastUploadedSha: String = "",
     val lastError: String? = null,
 )
 
+/** Server's reply to PUT /v1/snapshot. */
 @Serializable
-data class SyncSessionSnapshot(
-    val id: String,
-    val dateMs: Long,
-    val name: String,
-    val durationSec: Int,
-    val totalSets: Int,
-    val volume: Int,
-    val prs: Int,
+data class SnapshotPutResponse(
+    val version: Long,
+    val created_at: String = "",
+    val sha256: String = "",
+    val bytes: Int = 0,
+    val unchanged: Boolean = false,
 )
 
-@Serializable
-data class SyncTargetSnapshot(
-    val id: String,
-    val exId: String,
-    val target: Double,
-    val start: Double,
-    val startDMs: Long,
-    val weeks: Int,
-)
-
-@Serializable
-data class SyncPushRequest(
-    @SerialName("device_id") val deviceId: String,
-    val ops: List<SyncOp>,
-)
-
-@Serializable
-data class SyncPushResponse(
-    val accepted: Int = 0,
-    val error: String? = null,
-)
+/** GET /v1/snapshot/latest: the body plus the metadata headers. */
+data class RemoteSnapshot(val body: String, val version: Long, val createdAt: String, val sha256: String)
