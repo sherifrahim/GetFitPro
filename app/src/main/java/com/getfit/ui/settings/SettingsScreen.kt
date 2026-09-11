@@ -580,7 +580,7 @@ private fun SyncSection(vm: AppViewModel) {
         )
 
         FieldLabel("SERVER")
-        GfTextField(value = urlInput, onValueChange = { urlInput = it }, placeholder = "https://forge.mooo.com", masked = false)
+        GfTextField(value = urlInput, onValueChange = { urlInput = it }, placeholder = "https://getfit.mooo.com", masked = false)
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "Test", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,

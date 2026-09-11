@@ -4,7 +4,7 @@
 set -euo pipefail
 
 APP=/home/ubuntu/forge-sync
-HOST=${FORGE_HOST:-forge.mooo.com}
+HOST=${FORGE_HOST:-getfit.mooo.com}
 
 echo "== python venv =="
 cd "$APP"
