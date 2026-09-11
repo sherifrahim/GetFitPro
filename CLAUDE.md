@@ -21,7 +21,7 @@ The Android app (Kotlin + Jetpack Compose) is otherwise built to look and behave
 > exercises → detail → builder → guided session → progress → settings, hydrated from Room +
 > DataStore. Since then: AI review, CSV import/export, cloud-sync groundwork (inert), a Wear OS
 > companion, rest-timer feedback, and the trend insight. Unit tests live in `app/src/test/…`
-> (**111 tests**). The build order/spec live in `docs/superpowers/`.
+> (**136 tests**). The build order/spec live in `docs/superpowers/`.
 
 ## UI architecture note (important)
 
@@ -92,9 +92,24 @@ rate via Health Services `ExerciseClient`, batched every 8s.
 
 ## Post-MVP features
 
-- **AI review** (`data/ai/`) — sends the user's own Anthropic API key to the Messages API over plain
-  `HttpURLConnection`. No Retrofit/OkHttp: this project avoids new Gradle dependencies where a
-  simpler built-in approach works.
+- **AI coach** (`data/ai/`, `ui/ai/`) — two features, one client:
+  - *AI review* sends `buildWorkoutSummary`'s brief (sessions, bests, targets, trend verdicts, and
+    **training patterns** from `domain/Patterns.kt` — skipped weeks, gaps, day-of-week habits, rest
+    cadence, pace, volume direction, muscle balance) and asks for schedule → balance → progression
+    advice. Patterns and trends are **pre-computed facts**; the prompt tells the model to explain them,
+    not re-derive them.
+  - *Body check* (Progress → Body check) takes up to five photos via the system Photo Picker (no
+    storage permission), a goal, and an explicit **per-open consent** tick, then returns a physique
+    read plus concrete training changes. Photos are downscaled, EXIF-stripped, sent once, **never
+    persisted** — see the privacy notes at the top of `BodyAnalysis.kt` before touching it.
+  - `AnthropicClient` is the only HTTP path (plain `HttpURLConnection`, no Retrofit/OkHttp — this
+    project avoids new Gradle dependencies where a built-in approach works). Rules baked into it,
+    with reasons in the class doc: default model `claude-opus-5`; **don't send `thinking`** (omitting
+    is adaptive on Opus 5 and safe on older models); `max_tokens` must be thousands, not 1024,
+    because thinking tokens count against it; check `stop_reason == "refusal"` before reading
+    content; `fallbacks: "default"` only on models that accept it. `AnthropicRequestTest` pins the
+    wire shape. The user's key lives in `SecureKeyStore`; existing installs keep their **stored**
+    model — a new default doesn't overwrite it.
 - **Backup** (`data/backup/`) — full-fidelity on-device snapshot (JSON) in `filesDir/backups/`, plus
   save/restore through the storage picker. Restore REPLACES user data and is confirm-gated. Distinct
   from the CSV import/export below, which moves sets between apps and is lossy.
@@ -169,7 +184,7 @@ Two modules: `:app` (phone, min SDK 26) and `:wear` (Wear OS, min SDK 30). Alway
 ```bash
 ./gradlew :app:assembleDebug :wear:assembleDebug   # build both (do this first)
 ./gradlew :app:installDebug                        # install phone app
-./gradlew :app:testDebugUnitTest                   # JVM unit tests (111)
+./gradlew :app:testDebugUnitTest                   # JVM unit tests (136)
 ./gradlew :app:testDebugUnitTest --tests "com.getfit.domain.PrTest"   # single test class
 ./gradlew :app:connectedDebugAndroidTest           # instrumented/Compose UI tests
 ./gradlew :app:lintDebug                           # Android lint
