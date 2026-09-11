@@ -54,6 +54,7 @@ import com.getfit.core.ui.msIcon
 import com.getfit.data.ai.CompatPreset
 import com.getfit.data.ai.PROVIDER_ANTHROPIC
 import com.getfit.data.ai.PROVIDER_COMPAT
+import com.getfit.domain.Units
 import com.getfit.ui.AppViewModel
 
 @Composable
@@ -69,18 +70,29 @@ fun SettingsScreen(vm: AppViewModel) {
             Text("Settings", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 20.sp)
         }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(top = 8.dp, bottom = 30.dp)) {
-            // profile
+            // profile — real data only: name/initials from the profile, history from Room.
+            val data by vm.data.collectAsState()
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Brush.linearGradient(listOf(GfColor.SurfaceElevated, GfColor.SurfaceElevatedAlt))).border(1.dp, GfColor.Hairline06, RoundedCornerShape(22.dp)).padding(18.dp),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Brush.linearGradient(listOf(GfColor.SurfaceElevated, GfColor.SurfaceElevatedAlt))).border(1.dp, GfColor.Hairline06, RoundedCornerShape(22.dp))
+                    .clickable(remember { MutableInteractionSource() }, indication = null) { vm.openProfile() }.padding(18.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Box(Modifier.size(58.dp).clip(Pill).background(GfColor.Accent), contentAlignment = Alignment.Center) {
-                    Text("AR", color = GfColor.OnAccent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 22.sp)
+                    if (settings.initials.isNotBlank()) Text(settings.initials, color = GfColor.OnAccent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 22.sp)
+                    else Icon(msIcon("person"), null, tint = GfColor.OnAccent, modifier = Modifier.size(28.dp))
                 }
-                Column {
-                    Text("Alex Rivera", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 18.sp)
-                    Text("Member since 2024", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.sp)
+                Column(Modifier.weight(1f)) {
+                    Text(settings.name.ifBlank { "Set up your profile" }, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 18.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text(profileSubline(data.sessions.size, data.sessions.minOfOrNull { it.dateMs }), color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.sp)
                 }
+                Icon(msIcon("chevron_right"), null, tint = GfColor.TextFaint, modifier = Modifier.size(20.dp))
+            }
+
+            SectionLabel("Body")
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.Surface).border(1.dp, GfColor.Hairline06, RoundedCornerShape(20.dp))) {
+                NavRow("straighten", "Body measurements", data.measurements.firstOrNull()?.let { "Latest ${Units.fmtDisplay(Units.toDisplay(it.weightKg, settings.units), settings.units)} ${settings.units}" } ?: "Weight, body fat") { vm.openMeasurements() }
+                Divider()
+                NavRow("psychology", "Body check", "Photo-based physique assessment") { vm.openBodyCheck() }
             }
 
             SectionLabel("Preferences")
@@ -103,6 +115,23 @@ fun SettingsScreen(vm: AppViewModel) {
                 ToggleRow("vibration", "Haptics", settings.haptics) { vm.setHaptics(it) }
                 Divider()
                 ToggleRow("timer", "Auto-start rest", settings.autorest) { vm.setAutorest(it) }
+                Divider()
+                ToggleRow("smart_display", "Keep screen awake in a workout", settings.keepAwake) { vm.setKeepAwake(it) }
+                Divider()
+                ToggleRow("local_fire_department", "Celebrate PRs as you log them", settings.prNotify) { vm.setPrNotify(it) }
+                Divider()
+                // week start
+                Row(
+                    Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, indication = null) { vm.setWeekStartsMonday(!settings.weekStartsMonday) }.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Icon(msIcon("calendar_month"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
+                    Text("Week starts on", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.5.sp, modifier = Modifier.weight(1f))
+                    Row(Modifier.clip(Pill).background(GfColor.Background).padding(3.dp)) {
+                        UnitPill("Mon", settings.weekStartsMonday)
+                        UnitPill("Sun", !settings.weekStartsMonday)
+                    }
+                }
             }
 
             SectionLabel("Rest timer default")
@@ -130,6 +159,28 @@ fun SettingsScreen(vm: AppViewModel) {
 
             SectionLabel("Cloud sync")
             SyncSection(vm)
+
+            SectionLabel("Guides & about")
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.Surface).border(1.dp, GfColor.Hairline06, RoundedCornerShape(20.dp))) {
+                NavRow("info", "Getting started guide", "Replay the first-run tour") { vm.showOnboardingAgain() }
+                Divider()
+                var routineHelp by remember { mutableStateOf(false) }
+                NavRow("dashboard_customize", "Routine help", if (routineHelp) "Tap to hide" else "How routines and the rotation work") { routineHelp = !routineHelp }
+                if (routineHelp) {
+                    Text(
+                        "A routine is a named list of exercises with sets and reps. Forge keeps them in a rotation: the one marked UP NEXT is what Home and your watch offer to start, and finishing it moves the rotation on. " +
+                            "Pick a different one any time with \"Do this one next\" — from the Build tab, the Up next list on Home, or the watch. " +
+                            "Imports create a routine per workout name, and any past workout can be saved as a routine from its detail page.",
+                        color = GfColor.TextCue, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
+                    )
+                }
+                Divider()
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "dev" }
+                NavRow("fitness_center", "Forge $version", "Open source · github.com/sherifrahim/GetFitPro") {
+                    runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/sherifrahim/GetFitPro"))) }
+                }
+            }
 
             // clear all
             val confirm = nav.confirmClear
@@ -705,4 +756,20 @@ private fun Divider() {
 @Composable
 private fun SectionLabel(text: String) {
     Text(text.uppercase(), color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 12.sp, letterSpacing = 1.sp, modifier = Modifier.padding(top = 24.dp, bottom = 10.dp))
+}
+
+/** Icon + label + optional subline, chevron on the right: a row that opens something. */
+@Composable
+private fun NavRow(icon: String, label: String, sub: String?, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, indication = null, onClick = onClick).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Icon(msIcon(icon), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 14.5.sp)
+            if (!sub.isNullOrBlank()) Text(sub, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+        }
+        Icon(msIcon("chevron_right"), null, tint = GfColor.TextFaint, modifier = Modifier.size(20.dp))
+    }
 }

@@ -60,11 +60,12 @@ class SessionController(
     @Volatile private var autorest: Boolean = true
     @Volatile private var soundOn: Boolean = true
     @Volatile private var hapticsOn: Boolean = true
+    @Volatile private var prNotify: Boolean = true
 
     init {
         scope.launch {
             container.settingsStore.flow.collect {
-                units = it.units; autorest = it.autorest; soundOn = it.sound; hapticsOn = it.haptics
+                units = it.units; autorest = it.autorest; soundOn = it.sound; hapticsOn = it.haptics; prNotify = it.prNotify
             }
         }
         // Restore an in-progress session after process death, resyncing its clock immediately
@@ -164,7 +165,8 @@ class SessionController(
         _state.update { s ->
             s ?: return@update null
             val r = doneSet(s, units, System.currentTimeMillis())
-            if (r.pr) toast("New personal record!", "local_fire_department")
+            // The PR is still recorded either way; the pref only silences the live celebration.
+            if (r.pr && prNotify) toast("New personal record!", "local_fire_department")
             // If auto-start-rest is off, hold the rest timer paused until the user starts/skips it.
             if (r.state.phase == Phase.REST && !autorest) pauseSession(r.state, System.currentTimeMillis()) else r.state
         }

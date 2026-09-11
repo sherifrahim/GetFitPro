@@ -2,6 +2,7 @@ package com.getfit.ui
 
 import com.getfit.data.db.ExerciseEntity
 import com.getfit.data.db.SessionEntity
+import com.getfit.data.db.SessionSetEntity
 import com.getfit.data.db.SetLogEntity
 import com.getfit.data.db.TargetEntity
 import com.getfit.data.db.MeasurementEntity
@@ -18,6 +19,8 @@ data class AppData(
     val targets: List<TargetEntity> = emptyList(),
     val routinesData: RoutinesData = RoutinesData(),
     val measurements: List<MeasurementEntity> = emptyList(),
+    /** Every session's sets (history feed previews, workout detail). */
+    val sessionSets: List<SessionSetEntity> = emptyList(),
     val bestMap: Map<String, Best> = emptyMap(),
     val loaded: Boolean = false,
 ) {

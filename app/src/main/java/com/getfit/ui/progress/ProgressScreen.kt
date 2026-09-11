@@ -25,7 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +54,9 @@ import com.getfit.domain.targetDaysLeft
 import com.getfit.domain.targetPct
 import com.getfit.domain.weekAgg
 import com.getfit.domain.weekStartLocal
+import com.getfit.domain.fmtDur
+import com.getfit.domain.todayWeekIndex
+import com.getfit.domain.weekDayLetters
 import com.getfit.ui.AppViewModel
 import java.util.Calendar
 import kotlin.math.roundToInt
@@ -66,9 +71,9 @@ fun ProgressScreen(vm: AppViewModel) {
 
     val week = weekAgg(
         data.sessions.map { SessionRecord(it.id, it.dateMs, it.name, it.durationSec, it.totalSets, it.volume, it.prs) },
-        weekStartLocal(now),
+        weekStartLocal(now, settings.weekStartsMonday),
     )
-    val weekGoal = 5
+    val weekGoal = settings.weeklyGoal
     val weekDone = week.workouts
     val goalMsg = if (weekDone >= weekGoal) "You hit your weekly target — great work."
     else "${weekGoal - weekDone} more ${if (weekGoal - weekDone == 1) "session" else "sessions"} to hit your goal."
@@ -115,9 +120,9 @@ fun ProgressScreen(vm: AppViewModel) {
                 Text("Volume this week", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
                 Text("${Units.volDisplay(week.totalVolume, units)} $units", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
             }
-            val todayIdx = (Calendar.getInstance().get(Calendar.DAY_OF_WEEK) + 5) % 7
+            val todayIdx = todayWeekIndex(settings.weekStartsMonday)
             val maxV = (week.dayVolume.maxOrNull() ?: 0).coerceAtLeast(1)
-            val labels = listOf("M", "T", "W", "T", "F", "S", "S")
+            val labels = weekDayLetters(settings.weekStartsMonday)
             Row(Modifier.fillMaxWidth().height(120.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 labels.forEachIndexed { i, d ->
                     val frac = week.dayVolume[i].toFloat() / maxV
@@ -260,7 +265,7 @@ fun ProgressScreen(vm: AppViewModel) {
         }
 
         // recent sessions
-        Text("Recent sessions", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp, modifier = Modifier.padding(top = 26.dp, bottom = 12.dp))
+        Text("Workouts", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp, modifier = Modifier.padding(top = 26.dp, bottom = 12.dp))
         if (data.sessions.isEmpty()) {
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.Surface).border(1.dp, GfColor.Hairline10, RoundedCornerShape(20.dp)).padding(vertical = 32.dp, horizontal = 20.dp),
@@ -271,24 +276,59 @@ fun ProgressScreen(vm: AppViewModel) {
                 Text("Finish a session and it'll show up here with your time, sets and volume.", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.5.sp, lineHeight = 19.sp, textAlign = TextAlign.Center)
             }
         } else {
-            data.sessions.take(5).forEach { h ->
-                Row(
-                    Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(18.dp)).background(GfColor.Surface).border(1.dp, GfColor.Hairline06, RoundedCornerShape(18.dp)).padding(13.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp),
+            // Hevy-style feed: one card per workout with its stats and the first exercises. Tap for
+            // the full detail (muscle split, heart rate, every set, load changes vs last time).
+            var showAll by remember { mutableStateOf(false) }
+            val shown = if (showAll) data.sessions else data.sessions.take(6)
+            shown.forEach { h ->
+                val exSets = data.sessionSets.filter { it.sessionId == h.id }
+                val preview = exSets.groupBy { it.exerciseId }.values.map { rows -> "${rows.size} × ${rows.first().name}" }
+                Column(
+                    Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(18.dp)).background(GfColor.Surface).border(1.dp, GfColor.Hairline06, RoundedCornerShape(18.dp))
+                        .clickable(remember { MutableInteractionSource() }, indication = null) { vm.openSessionDetail(h.id) }.padding(14.dp),
                 ) {
-                    Box(Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)).background(GfColor.AccentFill12), contentAlignment = Alignment.Center) {
-                        Icon(msIcon("check_circle"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(h.name, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("${relDay(h.dateMs, now)} · ${fullDate(h.dateMs)}", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                        }
+                        Icon(msIcon("chevron_right"), null, tint = GfColor.TextFaint, modifier = Modifier.size(18.dp))
                     }
-                    Column(Modifier.weight(1f)) {
-                        Text(h.name, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W600, fontSize = 14.5.sp)
-                        Text("${(h.durationSec / 60).coerceAtLeast(1)} min · ${h.totalSets} sets · ${if (h.volume > 0) "${Units.volDisplay(h.volume, units)} $units" else "bodyweight"}", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        FeedStat("Time", if (h.durationSec > 0) fmtDur(h.durationSec) else "—")
+                        FeedStat("Volume", if (h.volume > 0) "${Units.volDisplay(h.volume, units)} $units" else "BW")
+                        FeedStat("Sets", h.totalSets.toString())
+                        if (h.prs > 0) FeedStat("Records", "🏅 ${h.prs}")
+                        if (h.avgBpm > 0) FeedStat("Avg bpm", "♥ ${h.avgBpm}")
+                        if (h.calories > 0) FeedStat("kcal", "~${h.calories}")
                     }
-                    Text(relDay(h.dateMs, now), color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.sp)
+                    if (preview.isNotEmpty()) {
+                        Text(
+                            preview.take(3).joinToString(", ") + if (preview.size > 3) " · ${preview.size - 3} more" else "",
+                            color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp),
+                        )
+                    }
                 }
+            }
+            if (data.sessions.size > 6) {
+                Text(
+                    if (showAll) "Show fewer" else "Show all ${data.sessions.size} workouts", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.sp,
+                    modifier = Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, indication = null) { showAll = !showAll }.padding(vertical = 10.dp), textAlign = TextAlign.Center,
+                )
             }
         }
     }
 }
+
+@Composable
+private fun FeedStat(label: String, value: String) {
+    Column {
+        Text(label, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 10.5.sp)
+        Text(value, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 14.sp, modifier = Modifier.padding(top = 2.dp), maxLines = 1)
+    }
+}
+
+private fun fullDate(ts: Long): String = java.text.SimpleDateFormat("d MMM", java.util.Locale.getDefault()).format(java.util.Date(ts))
 
 @Composable
 private fun ProgStat(icon: String, tint: Color, label: String, value: String, modifier: Modifier) {

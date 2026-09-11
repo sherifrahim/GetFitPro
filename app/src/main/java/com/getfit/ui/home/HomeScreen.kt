@@ -47,6 +47,8 @@ import com.getfit.domain.floorDayLocal
 import com.getfit.domain.fmtDur
 import com.getfit.domain.fmtVol
 import com.getfit.domain.streakCount
+import com.getfit.domain.todayWeekIndex
+import com.getfit.domain.weekDayLetters
 import com.getfit.domain.weekAgg
 import com.getfit.domain.weekStartLocal
 import com.getfit.ui.AppData
@@ -67,11 +69,11 @@ fun HomeScreen(vm: AppViewModel) {
     val greeting = when {
         hour < 12 -> "Good morning"; hour < 18 -> "Good afternoon"; else -> "Good evening"
     }
-    val todayIdx = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7
+    val todayIdx = todayWeekIndex(settings.weekStartsMonday, cal)
 
     val week = weekAgg(
         data.sessions.map { SessionRecord(it.id, it.dateMs, it.name, it.durationSec, it.totalSets, it.volume, it.prs) },
-        weekStartLocal(now),
+        weekStartLocal(now, settings.weekStartsMonday),
     )
     val streak = streakCount(data.sessions.map { it.dateMs }, now, ::floorDayLocal)
 
@@ -131,7 +133,7 @@ fun HomeScreen(vm: AppViewModel) {
         }
 
         Spacer(Modifier.height(16.dp))
-        StreakStrip(streak = streak, dayHit = week.dayHit, todayIdx = todayIdx)
+        StreakStrip(streak = streak, dayHit = week.dayHit, todayIdx = todayIdx, labels = weekDayLetters(settings.weekStartsMonday), goal = settings.weeklyGoal, done = week.workouts)
 
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -209,8 +211,7 @@ private fun HeroStat(value: String, label: String) {
 }
 
 @Composable
-private fun StreakStrip(streak: Int, dayHit: BooleanArray, todayIdx: Int) {
-    val labels = listOf("M", "T", "W", "T", "F", "S", "S")
+private fun StreakStrip(streak: Int, dayHit: BooleanArray, todayIdx: Int, labels: List<String>, goal: Int, done: Int) {
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(GfColor.Surface)
             .border(1.dp, GfColor.Hairline06, RoundedCornerShape(22.dp)).padding(horizontal = 18.dp, vertical = 16.dp),
@@ -220,7 +221,7 @@ private fun StreakStrip(streak: Int, dayHit: BooleanArray, todayIdx: Int) {
                 Icon(msIcon("local_fire_department"), null, tint = GfColor.Amber, modifier = Modifier.size(20.dp))
                 Text("$streak-day streak", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.5.sp)
             }
-            Text("This week", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp)
+            Text("$done of $goal this week", color = if (done >= goal) GfColor.Accent else GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp)
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             labels.forEachIndexed { i, d ->

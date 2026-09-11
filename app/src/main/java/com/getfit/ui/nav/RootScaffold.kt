@@ -41,7 +41,10 @@ import com.getfit.ui.onboarding.OnboardingScreen
 import com.getfit.ui.progress.GoalSheet
 import com.getfit.ui.progress.ProgressScreen
 import com.getfit.ui.session.SessionScreen
+import com.getfit.ui.settings.MeasurementsScreen
+import com.getfit.ui.settings.ProfileScreen
 import com.getfit.ui.settings.SettingsScreen
+import com.getfit.ui.progress.WorkoutDetailScreen
 import com.getfit.ui.splash.SplashScreen
 
 /** Tab shell + full-screen overlays + toast host. */
@@ -52,6 +55,8 @@ fun RootScaffold(vm: AppViewModel) {
 
     // Lowest priority: any non-Home tab goes back to Home before the system handles back (exit).
     BackHandler(enabled = nav.tab != TAB_HOME) { vm.selectTab(TAB_HOME) }
+    // ...except that an open routine editor closes first.
+    BackHandler(enabled = nav.tab == TAB_BUILD && nav.editRoutineId != null) { vm.closeRoutineEditor() }
 
     Box(Modifier.fillMaxSize().background(GfColor.Background)) {
 
@@ -86,7 +91,17 @@ fun RootScaffold(vm: AppViewModel) {
             nav.detailId?.let { DetailScreen(vm, it) }
         }
 
-        // Settings overlay
+        // Workout (history) detail overlay
+        BackHandler(enabled = nav.sessionDetailId != null) { vm.closeSessionDetail() }
+        AnimatedVisibility(
+            visible = nav.sessionDetailId != null,
+            enter = slideInVertically(tween(400)) { it },
+            exit = slideOutVertically(tween(300)) { it },
+        ) {
+            nav.sessionDetailId?.let { WorkoutDetailScreen(vm, it) }
+        }
+
+        // Settings overlay (+ its Profile and Measurements sub-screens above it)
         BackHandler(enabled = nav.settingsOpen) { vm.closeSettings() }
         AnimatedVisibility(
             visible = nav.settingsOpen,
@@ -94,6 +109,14 @@ fun RootScaffold(vm: AppViewModel) {
             exit = slideOutVertically(tween(300)) { it },
         ) {
             SettingsScreen(vm)
+        }
+        BackHandler(enabled = nav.profileOpen) { vm.closeProfile() }
+        AnimatedVisibility(visible = nav.profileOpen, enter = slideInVertically(tween(300)) { it }, exit = slideOutVertically(tween(250)) { it }) {
+            ProfileScreen(vm)
+        }
+        BackHandler(enabled = nav.measurementsOpen) { vm.closeMeasurements() }
+        AnimatedVisibility(visible = nav.measurementsOpen, enter = slideInVertically(tween(300)) { it }, exit = slideOutVertically(tween(250)) { it }) {
+            MeasurementsScreen(vm)
         }
 
         // Goal bottom sheet
@@ -124,6 +147,14 @@ fun RootScaffold(vm: AppViewModel) {
 
         // Guided session (top-most)
         val session by vm.session.collectAsState()
+        // "Keep screen awake in a workout": a window flag, so it costs nothing when off and clears
+        // itself the moment the session overlay leaves composition.
+        val view = androidx.compose.ui.platform.LocalView.current
+        val keepAwake = settings.keepAwake && session != null
+        androidx.compose.runtime.DisposableEffect(keepAwake) {
+            view.keepScreenOn = keepAwake
+            onDispose { view.keepScreenOn = false }
+        }
         BackHandler(enabled = session != null) { vm.endSession() }
         AnimatedVisibility(visible = session != null, enter = fadeIn(tween(300)), exit = fadeOut(tween(250))) {
             SessionScreen(vm)

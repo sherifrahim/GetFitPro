@@ -595,7 +595,7 @@ object ForgeIcons {
         ).path(
             fill = SolidColor(Color.Black),
             fillAlpha = 1f, strokeAlpha = 1f,
-            pathFillType = PathFillType.NonZero,
+            pathFillType = PathFillType.EvenOdd,
         ) {
             moveTo(8.43f, 4.0f)
             lineTo(15.57f, 4.0f)
@@ -766,7 +766,7 @@ object ForgeIcons {
         ).path(
             fill = SolidColor(Color.Black),
             fillAlpha = 1f, strokeAlpha = 1f,
-            pathFillType = PathFillType.NonZero,
+            pathFillType = PathFillType.EvenOdd,
         ) {
             moveTo(8.43f, 4.5f)
             lineTo(15.57f, 4.5f)
@@ -967,7 +967,7 @@ object ForgeIcons {
         ).path(
             fill = SolidColor(Color.Black),
             fillAlpha = 1f, strokeAlpha = 1f,
-            pathFillType = PathFillType.NonZero,
+            pathFillType = PathFillType.EvenOdd,
         ) {
             moveTo(8.22f, 3.0f)
             lineTo(15.78f, 3.0f)
@@ -1051,7 +1051,7 @@ object ForgeIcons {
         ).path(
             fill = SolidColor(Color.Black),
             fillAlpha = 1f, strokeAlpha = 1f,
-            pathFillType = PathFillType.NonZero,
+            pathFillType = PathFillType.EvenOdd,
         ) {
             moveTo(6.0f, 10.0f)
             lineTo(18.0f, 10.0f)
@@ -1080,7 +1080,7 @@ object ForgeIcons {
         ).path(
             fill = SolidColor(Color.Black),
             fillAlpha = 1f, strokeAlpha = 1f,
-            pathFillType = PathFillType.NonZero,
+            pathFillType = PathFillType.EvenOdd,
         ) {
             moveTo(8.22f, 3.0f)
             lineTo(15.78f, 3.0f)

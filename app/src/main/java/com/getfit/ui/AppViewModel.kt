@@ -76,10 +76,10 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 bestFor(ls.map { LoggedSet(it.exerciseId, it.weight, it.reps, it.dateMs) }, isBW(e.equipment, e.reps))
                     ?.let { bestMap[id] = it }
             }
-            AppData(ex, logs, sessions, targets, routines, emptyList(), bestMap, loaded = true)
+            AppData(ex, logs, sessions, targets, routines, emptyList(), emptyList(), bestMap, loaded = true)
         },
-        progressRepo.measurements,
-    ) { d, measurements -> d.copy(measurements = measurements) }
+        progressRepo.measurements, progressRepo.sessionSets,
+    ) { d, measurements, sessionSets -> d.copy(measurements = measurements, sessionSets = sessionSets) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppData())
 
     val settings: StateFlow<Settings> =
@@ -197,6 +197,41 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun setHaptics(v: Boolean) = viewModelScope.launch { settingsStore.setHaptics(v) }
     fun setAutorest(v: Boolean) = viewModelScope.launch { settingsStore.setAutorest(v) }
     fun setRest(v: Int) = viewModelScope.launch { settingsStore.setRestDefault(v) }
+    fun setKeepAwake(v: Boolean) = viewModelScope.launch { settingsStore.setKeepAwake(v) }
+    fun setPrNotify(v: Boolean) = viewModelScope.launch { settingsStore.setPrNotify(v) }
+    fun setWeekStartsMonday(v: Boolean) = viewModelScope.launch { settingsStore.setWeekStartsMonday(v) }
+    fun setWeeklyGoal(v: Int) = viewModelScope.launch { settingsStore.setWeeklyGoal(v) }
+
+    // ---- profile (Hevy: Edit Profile + Measurements) ----
+    fun openProfile() = _nav.update { it.copy(profileOpen = true) }
+    fun closeProfile() = _nav.update { it.copy(profileOpen = false) }
+    fun setProfileName(v: String) = viewModelScope.launch { settingsStore.setName(v) }
+    fun setProfileSex(v: String) = viewModelScope.launch { settingsStore.setSex(v) }
+    fun setProfileBirthYear(v: Int) = viewModelScope.launch { settingsStore.setBirthYear(v) }
+    fun setProfileHeightCm(v: Int) = viewModelScope.launch { settingsStore.setHeightCm(v) }
+    /** Body weight arrives in the display unit; stored in kg like every other weight. */
+    fun setProfileBodyWeight(display: Double) = viewModelScope.launch {
+        settingsStore.setBodyWeightKg(Units.fromDisplay(display, settings.value.units))
+    }
+
+    fun openMeasurements() = _nav.update { it.copy(measurementsOpen = true) }
+    fun closeMeasurements() = _nav.update { it.copy(measurementsOpen = false) }
+    /** Logging a weight also updates the profile weight, so the calorie estimate follows the scale. */
+    fun addMeasurement(weightDisplay: Double, bodyFatPct: Double?, note: String) = viewModelScope.launch {
+        val kg = Units.fromDisplay(weightDisplay, settings.value.units)
+        if (kg <= 0.0) return@launch
+        val now = System.currentTimeMillis()
+        progressRepo.addMeasurement(com.getfit.data.db.MeasurementEntity("m$now", now, Math.round(kg * 10) / 10.0, bodyFatPct, note.trim()))
+        settingsStore.setBodyWeightKg(kg)
+        toast("Measurement logged", "check_circle")
+    }
+    fun deleteMeasurement(id: String) = viewModelScope.launch { progressRepo.deleteMeasurement(id) }
+
+    /** Re-run the first-launch tour from Settings ("Getting started guide"). */
+    fun showOnboardingAgain() = viewModelScope.launch {
+        _nav.update { it.copy(settingsOpen = false, obSlide = 0) }
+        settingsStore.setOnboarded(false)
+    }
 
     fun clearAll() {
         if (!_nav.value.confirmClear) {

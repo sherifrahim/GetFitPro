@@ -71,6 +71,11 @@ interface SessionDao {
     @Query("SELECT * FROM session_sets")
     suspend fun allSetsOnce(): List<SessionSetEntity>
 
+    /** Live view of every session's sets, for the history feed's exercise previews. Small table: one
+     *  row per logged set. */
+    @Query("SELECT * FROM session_sets ORDER BY rowId ASC")
+    fun observeAllSets(): Flow<List<SessionSetEntity>>
+
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun byId(id: String): SessionEntity?
 

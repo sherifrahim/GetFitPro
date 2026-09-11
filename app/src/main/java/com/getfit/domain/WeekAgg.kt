@@ -38,12 +38,13 @@ fun weekAgg(sessions: List<SessionRecord>, weekStartMs: Long): WeekResult {
     return WeekResult(vol, hit, workouts, dur, total)
 }
 
-/** Monday-00:00 (local) of the current week (proto weekStart, L778). */
-fun weekStartLocal(now: Long): Long {
+/** Monday-00:00 (local) of the current week (proto weekStart, L778). [mondayStart] = false gives
+ *  the Sunday-start week Hevy offers as a preference; the default keeps the prototype's maths. */
+fun weekStartLocal(now: Long, mondayStart: Boolean = true): Long {
     val c = Calendar.getInstance()
     c.timeInMillis = now
-    // Calendar: Sunday=1..Saturday=7 -> Monday-based offset (Mon=0..Sun=6)
-    val mondayBased = (c.get(Calendar.DAY_OF_WEEK) + 5) % 7
+    // Calendar: Sunday=1..Saturday=7 -> Monday-based offset (Mon=0..Sun=6), or Sunday-based (Sun=0..Sat=6)
+    val mondayBased = if (mondayStart) (c.get(Calendar.DAY_OF_WEEK) + 5) % 7 else c.get(Calendar.DAY_OF_WEEK) - 1
     c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0)
     c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0)
     c.add(Calendar.DAY_OF_MONTH, -mondayBased)
@@ -58,3 +59,11 @@ fun floorDayLocal(ts: Long): Long {
     c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0)
     return c.timeInMillis
 }
+
+/** Index of today within the week strip (0 = the first day of the week), matching [weekStartLocal]. */
+fun todayWeekIndex(mondayStart: Boolean = true, c: Calendar = Calendar.getInstance()): Int =
+    if (mondayStart) (c.get(Calendar.DAY_OF_WEEK) + 5) % 7 else c.get(Calendar.DAY_OF_WEEK) - 1
+
+/** Day letters for the week strip, in the order the week is shown. */
+fun weekDayLetters(mondayStart: Boolean = true): List<String> =
+    if (mondayStart) listOf("M", "T", "W", "T", "F", "S", "S") else listOf("S", "M", "T", "W", "T", "F", "S")

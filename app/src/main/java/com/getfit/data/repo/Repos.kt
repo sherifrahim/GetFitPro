@@ -251,6 +251,7 @@ class ProgressRepo(
 ) {
 
     val sessions: Flow<List<SessionEntity>> = sessionDao.observeAll()
+    val sessionSets: Flow<List<SessionSetEntity>> = sessionDao.observeAllSets()
     val targets: Flow<List<TargetEntity>> = targetDao.observeAll()
     val measurements: Flow<List<MeasurementEntity>> = measurementDao.observeAll()
 
