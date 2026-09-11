@@ -138,6 +138,57 @@ object Curated {
         ),
     )
 
+    /**
+     * Program templates: named sets of routines built from the curated exercises, so "run PPL" or
+     * "run GZCLP" is one tap. Percentages/progression schemes (5/3/1's training-max maths, GZCLP's
+     * stage drops) are deliberately NOT modelled — Forge tracks what was lifted, the user picks the
+     * load; the templates give the structure and rep targets only.
+     */
+    data class Program(val id: String, val name: String, val blurb: String, val days: List<DefaultRoutine>)
+    val PROGRAMS = listOf(
+        Program("ppl", "Push / Pull / Legs", "The classic 3-day split. Rotate through all three, rest when you need.", DEFAULT_ROUTINES),
+        Program(
+            "ul", "Upper / Lower", "Two days, alternate them. Four sessions a week hits everything twice.",
+            listOf(
+                DefaultRoutine("p_ul_upper", "Upper", listOf(PlanItem("bench", 4, "6"), PlanItem("row", 4, "8"), PlanItem("ohp", 3, "8"), PlanItem("pulldown", 3, "10"), PlanItem("curl", 3, "12"), PlanItem("dip", 3, "10"))),
+                DefaultRoutine("p_ul_lower", "Lower", listOf(PlanItem("squat", 4, "6"), PlanItem("rdl", 3, "8"), PlanItem("legpress", 3, "12"), PlanItem("lunge", 3, "10"), PlanItem("legraise", 3, "12"), PlanItem("plank", 3, "45s"))),
+            ),
+        ),
+        Program(
+            "fb3", "Full body ×3", "Three different full-body days. Good for 3 sessions a week or a busy schedule.",
+            listOf(
+                DefaultRoutine("p_fb_a", "Full body A", listOf(PlanItem("squat", 3, "5"), PlanItem("bench", 3, "5"), PlanItem("row", 3, "8"), PlanItem("plank", 2, "45s"))),
+                DefaultRoutine("p_fb_b", "Full body B", listOf(PlanItem("rdl", 3, "8"), PlanItem("ohp", 3, "5"), PlanItem("pullup", 3, "6"), PlanItem("legraise", 2, "12"))),
+                DefaultRoutine("p_fb_c", "Full body C", listOf(PlanItem("legpress", 3, "10"), PlanItem("incline", 3, "8"), PlanItem("pulldown", 3, "10"), PlanItem("curl", 2, "12"))),
+            ),
+        ),
+        Program(
+            "531", "5/3/1-style", "One main lift a day, 5×5 on it, then assistance. Add weight when all five sets move well.",
+            listOf(
+                DefaultRoutine("p_531_ohp", "Press day", listOf(PlanItem("ohp", 5, "5"), PlanItem("dip", 3, "10"), PlanItem("lateral", 3, "12"), PlanItem("pushup", 3, "12"))),
+                DefaultRoutine("p_531_dl", "Pull day", listOf(PlanItem("rdl", 5, "5"), PlanItem("row", 4, "8"), PlanItem("pulldown", 3, "10"), PlanItem("plank", 3, "45s"))),
+                DefaultRoutine("p_531_bench", "Bench day", listOf(PlanItem("bench", 5, "5"), PlanItem("incline", 3, "8"), PlanItem("curl", 3, "12"), PlanItem("pushup", 3, "12"))),
+                DefaultRoutine("p_531_squat", "Squat day", listOf(PlanItem("squat", 5, "5"), PlanItem("lunge", 3, "10"), PlanItem("legpress", 3, "10"), PlanItem("legraise", 3, "12"))),
+            ),
+        ),
+        Program(
+            "gzclp", "GZCLP", "Linear progression: a heavy T1 (5×3), a moderate T2 (3×10) and a light T3 (3×15) each day, cycling A1 B1 A2 B2.",
+            listOf(
+                DefaultRoutine("p_gz_a1", "GZCLP A1", listOf(PlanItem("squat", 5, "3"), PlanItem("bench", 3, "10"), PlanItem("pulldown", 3, "15"))),
+                DefaultRoutine("p_gz_b1", "GZCLP B1", listOf(PlanItem("ohp", 5, "3"), PlanItem("rdl", 3, "10"), PlanItem("row", 3, "15"))),
+                DefaultRoutine("p_gz_a2", "GZCLP A2", listOf(PlanItem("bench", 5, "3"), PlanItem("squat", 3, "10"), PlanItem("pulldown", 3, "15"))),
+                DefaultRoutine("p_gz_b2", "GZCLP B2", listOf(PlanItem("rdl", 5, "3"), PlanItem("ohp", 3, "10"), PlanItem("row", 3, "15"))),
+            ),
+        ),
+        Program(
+            "bw", "Bodyweight only", "No equipment beyond a bar to hang from. Two alternating days.",
+            listOf(
+                DefaultRoutine("p_bw_a", "Bodyweight A", listOf(PlanItem("pushup", 4, "12"), PlanItem("pullup", 4, "6"), PlanItem("lunge", 3, "12"), PlanItem("plank", 3, "45s"))),
+                DefaultRoutine("p_bw_b", "Bodyweight B", listOf(PlanItem("dip", 3, "10"), PlanItem("burpee", 3, "12"), PlanItem("legraise", 3, "12"), PlanItem("pushup", 3, "15"))),
+            ),
+        ),
+    )
+
     /** Exercises offered in the "New target" sheet (proto GOAL_EX, L718). */
     val GOAL_EX = listOf("bench", "squat", "ohp", "row", "rdl", "pulldown", "curl", "incline", "swing")
 

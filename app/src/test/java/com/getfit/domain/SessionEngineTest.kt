@@ -130,3 +130,76 @@ class SessionEngineTest {
         assertThat(s.restLeft).isEqualTo(30)
     }
 }
+
+class SupersetEngineTest {
+    private fun items() = listOf(
+        SessionItem("a", "A", "Chest", sets = 2, reps = "8", bw = false, suggestW = 60.0, superset = true),
+        SessionItem("b", "B", "Back", sets = 2, reps = "10", bw = false, suggestW = 40.0),
+        SessionItem("c", "C", "Legs", sets = 1, reps = "5", bw = false, suggestW = 100.0),
+    )
+    private fun start() = startSession(items(), restDefault = 60, preBest = emptyMap(), now = 0L)
+
+    @Test fun partner_set_follows_with_no_rest_then_rest_then_next_round() {
+        var s = start()
+        s = doneSet(s.copy(curW = 62.5), "kg", now = 1000).state        // A1 -> straight to B1
+        assertThat(s.phase).isEqualTo(Phase.WORK)
+        assertThat(s.current.id).isEqualTo("b"); assertThat(s.setNum).isEqualTo(1)
+        assertThat(s.curW).isEqualTo(40.0)                               // B's prefill
+        s = doneSet(s, "kg", now = 2000).state                           // B1 -> rest
+        assertThat(s.phase).isEqualTo(Phase.REST)
+        s = advanceFromRest(s, false, now = 3000)                        // -> A2, with A's last weight
+        assertThat(s.current.id).isEqualTo("a"); assertThat(s.setNum).isEqualTo(2)
+        assertThat(s.curW).isEqualTo(62.5)
+        s = doneSet(s, "kg", now = 4000).state                           // A2 -> B2, no rest
+        assertThat(s.phase).isEqualTo(Phase.WORK); assertThat(s.current.id).isEqualTo("b"); assertThat(s.setNum).isEqualTo(2)
+        s = doneSet(s, "kg", now = 5000).state                           // B2 -> rest before C
+        assertThat(s.phase).isEqualTo(Phase.REST)
+        s = advanceFromRest(s, false, now = 6000)
+        assertThat(s.current.id).isEqualTo("c"); assertThat(s.setNum).isEqualTo(1)
+        s = doneSet(s, "kg", now = 7000).state
+        assertThat(s.phase).isEqualTo(Phase.DONE)
+        assertThat(s.log.map { it.id }).containsExactly("a", "b", "a", "b", "c").inOrder()
+        assertThat(s.completedSets).isEqualTo(5)
+    }
+
+    @Test fun member_with_fewer_sets_drops_out_of_later_rounds() {
+        val its = listOf(
+            SessionItem("a", "A", "Chest", sets = 3, reps = "8", bw = false, suggestW = 60.0, superset = true),
+            SessionItem("b", "B", "Back", sets = 1, reps = "10", bw = false, suggestW = 40.0),
+        )
+        var s = startSession(its, 60, emptyMap(), now = 0L)
+        s = doneSet(s, "kg", now = 1).state                 // A1 -> B1
+        s = doneSet(s, "kg", now = 2).state                 // B1 -> rest
+        s = advanceFromRest(s, false, now = 3)              // A2
+        assertThat(s.current.id).isEqualTo("a"); assertThat(s.setNum).isEqualTo(2)
+        s = doneSet(s, "kg", now = 4).state                 // A2 -> rest (B has no set 2)
+        assertThat(s.phase).isEqualTo(Phase.REST)
+        s = advanceFromRest(s, false, now = 5)              // A3
+        assertThat(s.current.id).isEqualTo("a"); assertThat(s.setNum).isEqualTo(3)
+        assertThat(doneSet(s, "kg", now = 6).state.phase).isEqualTo(Phase.DONE)
+    }
+
+    @Test fun plain_items_keep_the_prototype_order() {
+        val its = listOf(
+            SessionItem("a", "A", "Chest", sets = 2, reps = "8", bw = false, suggestW = 60.0),
+            SessionItem("b", "B", "Back", sets = 1, reps = "10", bw = false, suggestW = 40.0),
+        )
+        val s = startSession(its, 60, emptyMap(), now = 0L)
+        assertThat(nextPosition(s)).isEqualTo(NextPosition(0, 2, restFirst = true))
+        assertThat(nextPosition(s.copy(setNum = 2))).isEqualTo(NextPosition(1, 1, restFirst = true))
+        assertThat(nextPosition(s.copy(idx = 1, setNum = 1))).isNull()
+    }
+
+    @Test fun three_way_superset_rounds() {
+        val its = listOf(
+            SessionItem("a", "A", "Chest", sets = 2, reps = "8", bw = false, suggestW = 1.0, superset = true),
+            SessionItem("b", "B", "Back", sets = 2, reps = "8", bw = false, suggestW = 1.0, superset = true),
+            SessionItem("c", "C", "Legs", sets = 2, reps = "8", bw = false, suggestW = 1.0),
+        )
+        val s = startSession(its, 60, emptyMap(), now = 0L)
+        assertThat(nextPosition(s)).isEqualTo(NextPosition(1, 1, false))
+        assertThat(nextPosition(s.copy(idx = 1))).isEqualTo(NextPosition(2, 1, false))
+        assertThat(nextPosition(s.copy(idx = 2))).isEqualTo(NextPosition(0, 2, true))
+        assertThat(nextPosition(s.copy(idx = 2, setNum = 2))).isNull()
+    }
+}

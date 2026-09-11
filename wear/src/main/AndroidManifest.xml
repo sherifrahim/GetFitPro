@@ -34,9 +34,14 @@
             </intent-filter>
         </service>
 
+        <!-- A watch face doesn't rotate and neither should this. "locked" freezes whatever rotation the
+             display has when the activity opens (this Galaxy Watch runs at ROTATION_270 with system
+             auto-rotate on) instead of "nosensor", which would snap to the natural orientation and
+             could render upside-down relative to the watch face. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:screenOrientation="locked"
             android:taskAffinity=""
             android:theme="@android:style/Theme.DeviceDefault">
             <intent-filter>

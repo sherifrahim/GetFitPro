@@ -45,6 +45,7 @@ import com.getfit.ui.settings.MeasurementsScreen
 import com.getfit.ui.settings.ProfileScreen
 import com.getfit.ui.settings.SettingsScreen
 import com.getfit.ui.progress.WorkoutDetailScreen
+import com.getfit.ui.progress.RecapScreen
 import com.getfit.ui.splash.SplashScreen
 
 /** Tab shell + full-screen overlays + toast host. */
@@ -99,6 +100,11 @@ fun RootScaffold(vm: AppViewModel) {
             exit = slideOutVertically(tween(300)) { it },
         ) {
             nav.sessionDetailId?.let { WorkoutDetailScreen(vm, it) }
+        }
+
+        BackHandler(enabled = nav.recapOpen) { vm.closeRecap() }
+        AnimatedVisibility(visible = nav.recapOpen, enter = slideInVertically(tween(350)) { it }, exit = slideOutVertically(tween(300)) { it }) {
+            RecapScreen(vm)
         }
 
         // Settings overlay (+ its Profile and Measurements sub-screens above it)

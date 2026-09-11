@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -89,17 +90,30 @@ private fun RoutinesList(vm: AppViewModel) {
                 color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.sp,
             )
 
-            // new routine
-            val add = remember { MutableInteractionSource() }
-            Row(
-                Modifier.padding(top = 16.dp).fillMaxWidth().height(50.dp).clip(RoundedCornerShape(16.dp))
-                    .border(1.5.dp, Color(0x660B7BF7), RoundedCornerShape(16.dp))
-                    .clickable(add, indication = null) { vm.createRoutine("New routine") },
-                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(msIcon("add"), null, tint = GfColor.Accent, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("New routine", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.5.sp)
+            // new routine / explore programs
+            Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val add = remember { MutableInteractionSource() }
+                Row(
+                    Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(16.dp))
+                        .border(1.5.dp, Color(0x660B7BF7), RoundedCornerShape(16.dp))
+                        .clickable(add, indication = null) { vm.createRoutine("New routine") },
+                    horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(msIcon("add"), null, tint = GfColor.Accent, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("New routine", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.5.sp)
+                }
+                val explore = remember { MutableInteractionSource() }
+                Row(
+                    Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(16.dp)).background(GfColor.Surface)
+                        .border(1.dp, GfColor.Hairline08, RoundedCornerShape(16.dp))
+                        .clickable(explore, indication = null) { vm.openPrograms() },
+                    horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(msIcon("search"), null, tint = GfColor.Text, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Programs", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.5.sp)
+                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -112,6 +126,37 @@ private fun RoutinesList(vm: AppViewModel) {
                     onMenu = { vm.openRoutineMenu(r.id) },
                 )
                 Spacer(Modifier.height(12.dp))
+            }
+        }
+
+
+        if (nav.programsOpen) {
+            GfSheet(title = "Programs", onDismiss = vm::closePrograms) {
+                Text(
+                    "Ready-made routine sets. Adding one appends its days to your routines and makes the first day up next.",
+                    color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.5.sp, lineHeight = 18.sp,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+                Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+                    Curated.PROGRAMS.forEach { p ->
+                        val press = remember { MutableInteractionSource() }
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp)).background(GfColor.Background)
+                                .border(1.dp, GfColor.Hairline06, RoundedCornerShape(16.dp))
+                                .clickable(press, indication = null) { vm.addProgram(p.id) }.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(p.name, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
+                                Text(p.blurb, color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 3.dp))
+                                Text(p.days.joinToString(" · ") { it.name }, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.5.sp, modifier = Modifier.padding(top = 5.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
+                            Box(Modifier.clip(Pill).background(GfColor.Accent).padding(horizontal = 12.dp, vertical = 7.dp)) {
+                                Text("Add ${p.days.size}", color = GfColor.OnAccent, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -238,17 +283,33 @@ private fun RoutineEditor(vm: AppViewModel, routine: Routine) {
 
             Spacer(Modifier.height(16.dp))
             routine.items.forEachIndexed { i, item ->
+                val linkedFromAbove = i > 0 && routine.items[i - 1].superset
                 PlanRow(
                     item = item,
                     exName = data.exercise(item.id)?.name ?: item.id,
                     sub = subFor(data, item.id, settings.units),
                     isFirst = i == 0, isLast = i == routine.items.lastIndex,
+                    linked = item.superset || linkedFromAbove,
                     onUp = { vm.movePlan(i, -1) }, onDown = { vm.movePlan(i, 1) },
                     onLess = { vm.setSets(item.id, -1) }, onMore = { vm.setSets(item.id, 1) },
                     onReps = { vm.setReps(item.id, it) },
                     onRemove = { vm.removeFromPlan(item.id) },
                 )
-                Spacer(Modifier.height(10.dp))
+                // Superset link between this row and the next: a tappable chain in the gap.
+                if (i < routine.items.lastIndex) {
+                    val link = remember { MutableInteractionSource() }
+                    Row(
+                        Modifier.fillMaxWidth().height(22.dp).clickable(link, indication = null) { vm.toggleSuperset(item.id) },
+                        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.width(2.dp).height(22.dp).background(if (item.superset) GfColor.Accent else GfColor.Hairline08))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (item.superset) "Superset · no rest between" else "Link as superset",
+                            color = if (item.superset) GfColor.Accent else GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 11.sp,
+                        )
+                    }
+                } else Spacer(Modifier.height(10.dp))
             }
 
             // add exercise
@@ -289,7 +350,7 @@ private fun subFor(data: AppData, id: String, units: String): String {
 @Composable
 private fun PlanRow(
     item: PlanItemData, exName: String, sub: String,
-    isFirst: Boolean, isLast: Boolean,
+    isFirst: Boolean, isLast: Boolean, linked: Boolean,
     onUp: () -> Unit, onDown: () -> Unit, onLess: () -> Unit, onMore: () -> Unit,
     onReps: (String) -> Unit, onRemove: () -> Unit,
 ) {
@@ -298,7 +359,7 @@ private fun PlanRow(
     var reps by remember(item.id, item.reps) { mutableStateOf(item.reps) }
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(GfColor.Surface)
-            .border(1.dp, GfColor.Hairline06, RoundedCornerShape(18.dp)).padding(12.dp),
+            .border(1.dp, if (linked) Color(0x660B7BF7) else GfColor.Hairline06, RoundedCornerShape(18.dp)).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column {

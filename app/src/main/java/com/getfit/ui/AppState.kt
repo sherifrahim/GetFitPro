@@ -48,8 +48,11 @@ data class NavState(
     val editRoutineId: String? = null,
     /** Build tab: the routine whose "⋯" sheet is open. */
     val routineMenuId: String? = null,
+    /** Build tab: the program templates sheet. */
+    val programsOpen: Boolean = false,
     /** Progress tab: the session whose detail overlay is open. */
     val sessionDetailId: String? = null,
+    val recapOpen: Boolean = false,
     val profileOpen: Boolean = false,
     val measurementsOpen: Boolean = false,
     val booted: Boolean = false,

@@ -157,6 +157,11 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun movePlan(index: Int, dir: Int) = viewModelScope.launch { workoutRepo.movePlan(index, dir, targetRoutineId()) }
     fun setSets(id: String, delta: Int) = viewModelScope.launch { workoutRepo.setSets(id, delta, targetRoutineId()) }
     fun setReps(id: String, reps: String) = viewModelScope.launch { workoutRepo.setReps(id, reps, targetRoutineId()) }
+    fun toggleSuperset(id: String) = viewModelScope.launch {
+        val r = data.value.routine(targetRoutineId()) ?: data.value.currentRoutine ?: return@launch
+        val item = r.items.firstOrNull { it.id == id } ?: return@launch
+        workoutRepo.setSuperset(id, !item.superset, targetRoutineId())
+    }
     fun setIntensity(v: String) = viewModelScope.launch { settingsStore.setIntensity(v) }
 
     fun openRoutineEditor(id: String) = _nav.update { it.copy(tab = TAB_BUILD, editRoutineId = id, routineMenuId = null) }
@@ -184,6 +189,21 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         workoutRepo.setCurrentRoutine(id); closeRoutineMenu()
         data.value.routine(id)?.let { toast("${it.name} is up next", "event_upcoming") }
     }
+    fun openPrograms() = _nav.update { it.copy(programsOpen = true) }
+    fun closePrograms() = _nav.update { it.copy(programsOpen = false) }
+    /** Adds a template's routines (after the existing ones) and makes its first day the one up next. */
+    fun addProgram(id: String) = viewModelScope.launch {
+        val p = Curated.PROGRAMS.firstOrNull { it.id == id } ?: return@launch
+        var first: String? = null
+        p.days.forEach { d ->
+            val r = workoutRepo.createRoutine(d.name, d.items.map { PlanItemData(it.id, it.sets, it.reps) })
+            if (first == null) first = r.id
+        }
+        first?.let { workoutRepo.setCurrentRoutine(it) }
+        closePrograms()
+        toast("Added ${p.days.size} routines from ${p.name}", "playlist_add_check")
+    }
+
     fun saveSessionAsRoutine(sessionId: String) = viewModelScope.launch {
         val r = workoutRepo.routineFromSession(sessionId)
         toast(if (r != null) "Saved as routine \"${r.name}\"" else "Nothing to save", if (r != null) "playlist_add_check" else "info")
@@ -322,6 +342,8 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     // ---- history ----
     fun openSessionDetail(id: String) = _nav.update { it.copy(sessionDetailId = id) }
+    fun openRecap() = _nav.update { it.copy(recapOpen = true) }
+    fun closeRecap() = _nav.update { it.copy(recapOpen = false) }
     fun closeSessionDetail() = _nav.update { it.copy(sessionDetailId = null) }
     fun deleteSession(id: String) = viewModelScope.launch {
         workoutRepo.deleteSession(id)

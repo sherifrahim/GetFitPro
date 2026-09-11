@@ -161,6 +161,14 @@ class WorkoutRepo(
         edit(r.id) { it.copy(items = it.items.map { p -> if (p.id == id) p.copy(reps = clean) else p }) }
     }
 
+    /** Link / unlink an item with the one after it as a superset. The last item has no partner. */
+    suspend fun setSuperset(id: String, on: Boolean, routineId: String? = null) {
+        val r = resolve(routineId) ?: return
+        val i = r.items.indexOfFirst { it.id == id }
+        if (i < 0 || (on && i == r.items.lastIndex)) return
+        edit(r.id) { it.copy(items = it.items.map { p -> if (p.id == id) p.copy(superset = on) else p }) }
+    }
+
     suspend fun resetPlan() {
         routinesStore.resetToDefault()
         syncRepo.noteChange()

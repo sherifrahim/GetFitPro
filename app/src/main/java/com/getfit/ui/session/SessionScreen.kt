@@ -55,6 +55,7 @@ import com.getfit.domain.fmtVol
 import com.getfit.domain.fmtW
 import com.getfit.domain.initReps
 import com.getfit.domain.isTimeBased
+import com.getfit.domain.nextPosition
 import com.getfit.domain.prPace
 import com.getfit.ui.AppViewModel
 
@@ -129,10 +130,14 @@ private fun ActiveView(s: SessionState, units: String, vm: AppViewModel) {
             val bpm by vm.liveHeartRateBpm.collectAsState()
             val hr = bpm?.let { b -> " · ♥ ${b.toInt()} bpm" } ?: ""
             Text("${it.muscle} · ${fmtClock(s.elapsed)} elapsed$hr", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp))
+            // Superset partner coming up with no rest: say so before the user reaches for the timer.
+            if (!isRest) nextPosition(s)?.takeIf { p -> !p.restFirst }?.let { p ->
+                Text("Superset · then ${s.items[p.idx].name}, no rest", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+            }
         }
 
         if (isRest) {
-            val nextName = if (s.setNum < it.sets) it.name else s.items.getOrNull(s.idx + 1)?.name ?: "Finish"
+            val nextName = nextPosition(s)?.let { p -> s.items[p.idx].name } ?: "Finish"
             Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 RestSideButton("−15") { tick(); ctrl.addRest(-15) }
                 Row(

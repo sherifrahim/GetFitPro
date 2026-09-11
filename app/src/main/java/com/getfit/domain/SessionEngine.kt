@@ -27,6 +27,8 @@ data class SessionItem(
     val suggestW: Double,
     /** Equipment string from the library; "Barbell" turns on the plate calculator and warm-up ramp. */
     val equipment: String = "",
+    /** Linked with the NEXT item as a superset: their sets alternate with no rest in between. */
+    val superset: Boolean = false,
 )
 
 @Serializable
@@ -132,26 +134,60 @@ fun tick(s: SessionState, now: Long = System.currentTimeMillis()): SessionState 
     }
 }
 
-/** Rest finished (or skipped): advance to the next set/exercise and re-enter work. */
-fun advanceFromRest(s: SessionState, fromTick: Boolean, now: Long = System.currentTimeMillis()): SessionState {
-    val it = s.items[s.idx]
-    var idx = s.idx
-    var setNum = s.setNum
-    var curW = s.curW
-    var curR = s.curR
-    if (s.setNum < it.sets) {
-        setNum += 1
-    } else {
-        idx += 1
-        setNum = 1
-        val ni = s.items[idx]
-        curW = ni.suggestW
-        curR = initReps(ni.reps)
+/**
+ * Where the session goes after the set at (idx, setNum) is logged: the next (item, set) and whether
+ * a rest comes first. Null = that was the last set of the session.
+ *
+ * Supersets: consecutive items linked by [SessionItem.superset] form a group. A group is worked in
+ * rounds — set 1 of each member back-to-back with NO rest, then a rest, then set 2 of each, and so
+ * on. Members with fewer sets simply drop out of later rounds. Everything else is the prototype's
+ * linear order: next set of the same exercise, else the next exercise, resting in between.
+ */
+data class NextPosition(val idx: Int, val setNum: Int, val restFirst: Boolean)
+
+fun nextPosition(s: SessionState): NextPosition? {
+    val items = s.items
+    var start = s.idx
+    while (start > 0 && items[start - 1].superset) start--
+    var end = s.idx
+    while (end < items.size - 1 && items[end].superset) end++
+
+    if (start == end) {
+        // Plain exercise (prototype path).
+        return when {
+            s.setNum < items[s.idx].sets -> NextPosition(s.idx, s.setNum + 1, restFirst = true)
+            s.idx + 1 < items.size -> NextPosition(s.idx + 1, 1, restFirst = true)
+            else -> null
+        }
     }
+    // Same round, next member that still has this set number: straight into it, no rest.
+    for (k in s.idx + 1..end) if (items[k].sets >= s.setNum) return NextPosition(k, s.setNum, restFirst = false)
+    // Next round, first member with a set left.
+    val round = s.setNum + 1
+    for (k in start..end) if (items[k].sets >= round) return NextPosition(k, round, restFirst = true)
+    // Group exhausted.
+    return if (end + 1 < items.size) NextPosition(end + 1, 1, restFirst = true) else null
+}
+
+/** Applies a [NextPosition] to the state: new item/set, that item's prefilled weight/reps, WORK. */
+private fun moveTo(s: SessionState, p: NextPosition, now: Long): SessionState {
+    val ni = s.items[p.idx]
+    val sameItem = p.idx == s.idx
+    // Same exercise again: keep what the user dialled in. Coming back to an exercise (superset round
+    // 2): its last logged set. A fresh exercise: the prefill.
+    val last = if (sameItem) null else s.log.lastOrNull { it.id == ni.id }
     return s.copy(
-        idx = idx, setNum = setNum, curW = curW, curR = curR,
+        idx = p.idx, setNum = p.setNum,
+        curW = if (sameItem) s.curW else last?.weight ?: ni.suggestW,
+        curR = if (sameItem) s.curR else last?.reps ?: initReps(ni.reps),
         phase = Phase.WORK, restLeft = 0, elapsed = elapsedSec(s, now),
     )
+}
+
+/** Rest finished (or skipped): advance to the next set/exercise and re-enter work. */
+fun advanceFromRest(s: SessionState, fromTick: Boolean, now: Long = System.currentTimeMillis()): SessionState {
+    val p = nextPosition(s) ?: return s.copy(phase = Phase.DONE, elapsed = elapsedSec(s, now))
+    return moveTo(s, p, now)
 }
 
 /** Log the current set, detect PRs, then move to rest (or finish). Returns state + whether a PR hit. */
@@ -175,17 +211,14 @@ fun doneSet(s: SessionState, units: String, now: Long = System.currentTimeMillis
         s.newPRs.filterNot { it2 -> it2.id == it.id } +
             PrItem(it.id, it.name, if (it.bw) "$reps reps" else "${fmtW(w)} $units × $reps")
     } else s.newPRs
-    val lastSet = s.setNum >= it.sets
-    val lastEx = s.idx >= s.items.size - 1
     val elapsed = elapsedSec(s, now)
-    val next = if (lastSet && lastEx) {
-        s.copy(log = log, completedSets = completedSets, volume = volume, preBest = preBest, newPRs = newPRs, phase = Phase.DONE, elapsed = elapsed)
-    } else {
-        val restEnd = now + s.restTotal * 1000L
-        s.copy(
-            log = log, completedSets = completedSets, volume = volume, preBest = preBest, newPRs = newPRs,
-            phase = Phase.REST, restLeft = s.restTotal, restEndAtMs = restEnd, elapsed = elapsed,
-        )
+    val logged = s.copy(log = log, completedSets = completedSets, volume = volume, preBest = preBest, newPRs = newPRs, elapsed = elapsed)
+    val p = nextPosition(s)
+    val next = when {
+        p == null -> logged.copy(phase = Phase.DONE)
+        // Superset partner: straight into its set, no rest.
+        !p.restFirst -> moveTo(logged, p, now)
+        else -> logged.copy(phase = Phase.REST, restLeft = s.restTotal, restEndAtMs = now + s.restTotal * 1000L)
     }
     return DoneResult(next, pr)
 }
