@@ -10,7 +10,12 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.getfit.wear"
+        // MUST match the phone app's applicationId. The Wearable Data Layer delivers MessageClient/
+        // DataClient traffic only to the app with the SAME package name on the other device (and
+        // Play bundles a Wear app under the phone listing by the same rule). With "com.getfit.wear"
+        // here, every snapshot the phone sent on a real Galaxy Watch went nowhere — silently, no log
+        // on either side. The Kotlin namespace stays com.getfit.wear; only the installed id changes.
+        applicationId = "com.getfit"
         // Wear OS 3+ only (API 30) — required for the Health Services ExerciseClient API used for
         // live heart rate; the phone app's minSdk (26) doesn't apply to this module.
         minSdk = 30

@@ -133,9 +133,9 @@ fun GfToast(text: String, icon: ImageVector, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = GfColor.OnAccentDim, modifier = Modifier.size(18.dp))
+        Icon(icon, contentDescription = null, tint = GfColor.Accent, modifier = Modifier.size(18.dp))
         Text(
-            text, color = GfColor.OnAccent, fontFamily = Manrope,
+            text, color = GfColor.OnLight, fontFamily = Manrope,
             fontWeight = FontWeight.W700, fontSize = 13.5.sp,
         )
     }

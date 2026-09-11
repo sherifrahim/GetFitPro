@@ -39,6 +39,9 @@ object GfColor {
     val Accent = Color(0xFF0B7BF7)
     val AccentDeep = Color(0xFF0A63C9)
     val OnAccent = Color(0xFFFFFFFF)
+    /** Text/icons placed ON a white surface (the toast, the white Start pill, PR rows). Distinct from
+     *  OnAccent, which is white: the retheme silently turned white-on-white wherever the two met. */
+    val OnLight = Color(0xFF0A0A0A)
 
     // Secondary text sitting ON the accent fill (the Today card's stat labels). Translucent white
     // now, where the lime scheme used dark olive shades.

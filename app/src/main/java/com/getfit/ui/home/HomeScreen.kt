@@ -175,7 +175,7 @@ private fun HeroCard(intensity: String, rpe: String, exCount: Int, sets: Int, es
             ) {
                 Icon(msIcon("play_arrow"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Start workout", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
+                Text("Start workout", color = GfColor.OnLight, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
             }
         }
     }

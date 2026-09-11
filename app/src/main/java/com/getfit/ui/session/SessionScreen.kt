@@ -120,7 +120,11 @@ private fun ActiveView(s: SessionState, units: String, vm: AppViewModel) {
                 }
             }
             Text(it.name, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 20.sp, modifier = Modifier.padding(top = 18.dp))
-            Text("${it.muscle} · ${fmtClock(s.elapsed)} elapsed", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp))
+            // Live heart rate arrives from the watch in ~8 s batches (PhoneWearSync); null until the
+            // first batch, or when no watch is paired, in which case the line reads as before.
+            val bpm by vm.liveHeartRateBpm.collectAsState()
+            val hr = bpm?.let { b -> " · ♥ ${b.toInt()} bpm" } ?: ""
+            Text("${it.muscle} · ${fmtClock(s.elapsed)} elapsed$hr", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp))
         }
 
         if (isRest) {
@@ -232,7 +236,7 @@ private fun DoneView(s: SessionState, units: String, onFinish: () -> Unit) {
                 s.newPRs.forEach { pr ->
                     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(GfColor.OnAccent).padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Icon(msIcon("local_fire_department"), null, tint = GfColor.Amber, modifier = Modifier.size(20.dp))
-                        Text(pr.name, color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.5.sp, modifier = Modifier.weight(1f))
+                        Text(pr.name, color = GfColor.OnLight, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.5.sp, modifier = Modifier.weight(1f))
                         Text(pr.value, color = GfColor.Accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 13.5.sp)
                     }
                 }
