@@ -1,0 +1,24 @@
+[Unit]
+Description=Forge sync (snapshot backup server for the Forge app)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/forge-sync
+EnvironmentFile=/home/ubuntu/forge-sync/.env
+ExecStart=/home/ubuntu/forge-sync/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8001 --workers 1 --no-access-log
+Restart=always
+RestartSec=5
+# This VM has 1 GB shared with threatfeed + Postgres. Cap this service hard so a leak can only
+# ever kill itself, and leave it MORE killable than threatfeed (which runs at -500).
+MemoryMax=160M
+OOMScoreAdjust=200
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/forge-sync
+
+[Install]
+WantedBy=multi-user.target
