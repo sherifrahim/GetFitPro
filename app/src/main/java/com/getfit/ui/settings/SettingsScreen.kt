@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +51,9 @@ import com.getfit.core.theme.Manrope
 import com.getfit.core.theme.Pill
 import com.getfit.core.theme.SpaceGrotesk
 import com.getfit.core.ui.msIcon
+import com.getfit.data.ai.CompatPreset
+import com.getfit.data.ai.PROVIDER_ANTHROPIC
+import com.getfit.data.ai.PROVIDER_COMPAT
 import com.getfit.ui.AppViewModel
 
 @Composable
@@ -57,6 +61,7 @@ fun SettingsScreen(vm: AppViewModel) {
     val settings by vm.settings.collectAsState()
     val nav by vm.nav.collectAsState()
     val hasAiKey by vm.hasAiKey.collectAsState()
+    val hasCompatKey by vm.hasCompatKey.collectAsState()
 
     Column(Modifier.fillMaxSize().background(GfColor.Background).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -115,7 +120,7 @@ fun SettingsScreen(vm: AppViewModel) {
             }
 
             SectionLabel("AI coach")
-            AiKeySection(hasAiKey = hasAiKey, model = settings.aiModel, vm = vm)
+            AiProviderSection(hasAiKey = hasAiKey, hasCompatKey = hasCompatKey, settings = settings, vm = vm)
 
             SectionLabel("Backup")
             BackupSection(vm)
@@ -180,63 +185,147 @@ private fun GfSwitch(on: Boolean) {
     }
 }
 
+
+/**
+ * AI provider: Anthropic (Messages API) or any OpenAI-compatible endpoint (OpenAI, Groq, DeepSeek,
+ * OpenRouter, self-hosted). Each has its own encrypted key slot and its own model field, so switching
+ * back and forth never loses either configuration.
+ */
 @Composable
-private fun AiKeySection(hasAiKey: Boolean, model: String, vm: AppViewModel) {
-    var keyInput by remember { mutableStateOf("") }
-    var modelInput by remember(model) { mutableStateOf(model) }
-    var reveal by remember { mutableStateOf(false) }
+private fun AiProviderSection(hasAiKey: Boolean, hasCompatKey: Boolean, settings: com.getfit.data.prefs.Settings, vm: AppViewModel) {
+    val compat = settings.aiProvider == PROVIDER_COMPAT
 
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.Surface)
             .border(1.dp, GfColor.Hairline06, RoundedCornerShape(20.dp)).padding(16.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(msIcon(if (hasAiKey) "check_circle" else "info"), null, tint = if (hasAiKey) GfColor.Accent else GfColor.TextFaint, modifier = Modifier.size(16.dp))
-            Text(
-                if (hasAiKey) "API key saved" else "No API key set", color = GfColor.TextDim, fontFamily = Manrope,
-                fontWeight = FontWeight.W600, fontSize = 12.5.sp,
-            )
-        }
-        Text(
-            "Bring your own Anthropic API key — it's encrypted on-device and only ever sent to " +
-                "Anthropic's API when you ask for a review. Get one at console.anthropic.com.",
-            color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp,
-            lineHeight = 17.sp, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
-        )
-
-        GfTextField(
-            value = keyInput, onValueChange = { keyInput = it },
-            placeholder = if (hasAiKey) "New key (leave blank to keep current)" else "sk-ant-...",
-            masked = !reveal,
-        )
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                if (reveal) "Hide" else "Show", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.sp,
-                modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null) { reveal = !reveal },
-            )
-            Row {
-                if (hasAiKey) {
-                    Text(
-                        "Remove key", color = GfColor.Coral, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
-                        modifier = Modifier.padding(end = 18.dp).clickable(remember { MutableInteractionSource() }, indication = null) { vm.clearAiApiKey() },
-                    )
+        // --- provider switch ---
+        Row(Modifier.fillMaxWidth().clip(Pill).background(GfColor.Background).padding(3.dp)) {
+            listOf(PROVIDER_ANTHROPIC to "Anthropic", PROVIDER_COMPAT to "OpenAI-compatible").forEach { (id, label) ->
+                val sel = settings.aiProvider == id
+                Box(
+                    Modifier.weight(1f).clip(Pill).background(if (sel) GfColor.Accent else Color.Transparent)
+                        .clickable(remember { MutableInteractionSource() }, indication = null) { vm.setAiProvider(id) }
+                        .padding(vertical = 9.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(label, color = if (sel) GfColor.OnAccent else GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
                 }
-                Text(
-                    "Save", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
-                    modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null) {
-                        if (keyInput.isNotBlank()) { vm.setAiApiKey(keyInput); keyInput = "" }
-                    },
-                )
             }
         }
 
-        Text("MODEL", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 10.5.sp, letterSpacing = 1.sp, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
-        GfTextField(
-            value = modelInput, onValueChange = { modelInput = it }, placeholder = "claude-opus-5", masked = false,
+        if (!compat) {
+            AnthropicFields(hasAiKey, settings.aiModel, vm)
+        } else {
+            CompatFields(hasCompatKey, settings, vm)
+        }
+    }
+}
+
+@Composable
+private fun AnthropicFields(hasAiKey: Boolean, model: String, vm: AppViewModel) {
+    var keyInput by remember { mutableStateOf("") }
+    var modelInput by remember(model) { mutableStateOf(model) }
+    var reveal by remember { mutableStateOf(false) }
+
+    Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Icon(msIcon(if (hasAiKey) "check_circle" else "info"), null, tint = if (hasAiKey) GfColor.Accent else GfColor.TextFaint, modifier = Modifier.size(16.dp))
+        Text(if (hasAiKey) "API key saved" else "No API key set", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp)
+    }
+    Text(
+        "Bring your own Anthropic API key — it's encrypted on-device and only ever sent to Anthropic's API " +
+            "when you ask for a review or body check. Get one at console.anthropic.com.",
+        color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp,
+        lineHeight = 17.sp, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
+    )
+    GfTextField(value = keyInput, onValueChange = { keyInput = it }, placeholder = if (hasAiKey) "New key (leave blank to keep current)" else "sk-ant-...", masked = !reveal)
+    KeyActions(reveal = reveal, onReveal = { reveal = !reveal }, hasKey = hasAiKey, onRemove = vm::clearAiApiKey) {
+        if (keyInput.isNotBlank()) { vm.setAiApiKey(keyInput); keyInput = "" }
+    }
+    FieldLabel("MODEL")
+    GfTextField(value = modelInput, onValueChange = { modelInput = it }, placeholder = "claude-opus-5", masked = false)
+    LaunchedEffect(modelInput) { if (modelInput.isNotBlank() && modelInput != model) vm.setAiModel(modelInput) }
+}
+
+@Composable
+private fun CompatFields(hasKey: Boolean, settings: com.getfit.data.prefs.Settings, vm: AppViewModel) {
+    var keyInput by remember { mutableStateOf("") }
+    var urlInput by remember(settings.compatBaseUrl) { mutableStateOf(settings.compatBaseUrl) }
+    var modelInput by remember(settings.compatModel) { mutableStateOf(settings.compatModel) }
+    var reveal by remember { mutableStateOf(false) }
+    val activePreset = CompatPreset.values().firstOrNull { it.baseUrl.isNotBlank() && it.baseUrl == settings.compatBaseUrl }
+
+    Text(
+        "Any OpenAI-compatible endpoint. Groq has a free tier; DeepSeek is very cheap; OpenRouter gives " +
+            "one key for many models. The body check needs a model that accepts images — the presets " +
+            "below default to one.",
+        color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp,
+        lineHeight = 17.sp, modifier = Modifier.padding(top = 14.dp, bottom = 12.dp),
+    )
+
+    // Presets fill the URL and a known-good vision model; the fields stay editable.
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        CompatPreset.values().forEach { p ->
+            val sel = activePreset == p
+            Box(
+                Modifier.clip(Pill).background(if (sel) GfColor.AccentFill15 else GfColor.Background)
+                    .border(1.dp, if (sel) GfColor.Accent else GfColor.Hairline08, Pill)
+                    .clickable(remember { MutableInteractionSource() }, indication = null) {
+                        if (p.baseUrl.isNotBlank()) { urlInput = p.baseUrl; vm.setCompatBaseUrl(p.baseUrl) }
+                        if (p.defaultModel.isNotBlank()) { modelInput = p.defaultModel; vm.setCompatModel(p.defaultModel) }
+                    }
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+            ) {
+                Text(p.label, color = if (sel) GfColor.Accent else GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.sp)
+            }
+        }
+    }
+    activePreset?.let {
+        Text(it.hint, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 11.5.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 8.dp))
+    }
+
+    FieldLabel("ENDPOINT (BASE URL)")
+    GfTextField(value = urlInput, onValueChange = { urlInput = it }, placeholder = "https://api.groq.com/openai/v1", masked = false)
+    LaunchedEffect(urlInput) { if (urlInput.trim().trimEnd('/') != settings.compatBaseUrl) vm.setCompatBaseUrl(urlInput) }
+
+    FieldLabel("API KEY")
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+        Icon(msIcon(if (hasKey) "check_circle" else "info"), null, tint = if (hasKey) GfColor.Accent else GfColor.TextFaint, modifier = Modifier.size(16.dp))
+        Text(if (hasKey) "Key saved" else "No key set (a self-hosted server may not need one)", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp)
+    }
+    GfTextField(value = keyInput, onValueChange = { keyInput = it }, placeholder = if (hasKey) "New key (leave blank to keep current)" else "Paste key", masked = !reveal)
+    KeyActions(reveal = reveal, onReveal = { reveal = !reveal }, hasKey = hasKey, onRemove = vm::clearCompatApiKey) {
+        if (keyInput.isNotBlank()) { vm.setCompatApiKey(keyInput); keyInput = "" }
+    }
+
+    FieldLabel("MODEL")
+    GfTextField(value = modelInput, onValueChange = { modelInput = it }, placeholder = "a vision-capable model id", masked = false)
+    LaunchedEffect(modelInput) { if (modelInput.trim() != settings.compatModel) vm.setCompatModel(modelInput) }
+}
+
+@Composable
+private fun FieldLabel(t: String) {
+    Text(t, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 10.5.sp, letterSpacing = 1.sp, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
+}
+
+@Composable
+private fun KeyActions(reveal: Boolean, onReveal: () -> Unit, hasKey: Boolean, onRemove: () -> Unit, onSave: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            if (reveal) "Hide" else "Show", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.sp,
+            modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null, onClick = onReveal),
         )
-        LaunchedEffect(modelInput) {
-            // Debounce-free: this is a rarely-typed field, save on every change is fine.
-            if (modelInput.isNotBlank() && modelInput != model) vm.setAiModel(modelInput)
+        Row {
+            if (hasKey) {
+                Text(
+                    "Remove key", color = GfColor.Coral, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
+                    modifier = Modifier.padding(end = 18.dp).clickable(remember { MutableInteractionSource() }, indication = null, onClick = onRemove),
+                )
+            }
+            Text(
+                "Save", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp,
+                modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null, onClick = onSave),
+            )
         }
     }
 }

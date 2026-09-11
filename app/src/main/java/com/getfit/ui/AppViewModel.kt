@@ -4,15 +4,20 @@ import android.content.ContentResolver
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.getfit.data.ai.AI_REVIEW_MAX_TOKENS
+import com.getfit.data.ai.AiGateway
 import com.getfit.data.ai.AiResult
-import com.getfit.data.ai.AiReviewClient
-import com.getfit.data.ai.AnthropicClient
+import com.getfit.data.ai.BODY_CHECK_MAX_TOKENS
+import com.getfit.data.ai.PROVIDER_ANTHROPIC
+import com.getfit.data.ai.PROVIDER_COMPAT
+import com.getfit.data.ai.aiReviewSystemPrompt
+import com.getfit.data.ai.textBlock
+import com.getfit.data.security.KeySlot
 import com.getfit.data.ai.BodyGoal
 import com.getfit.data.ai.ImageEncoder
 import com.getfit.data.ai.PhotoView
 import com.getfit.data.ai.bodyAnalysisSystemPrompt
 import com.getfit.data.ai.buildBodyAnalysisContent
-import com.getfit.data.ai.AiReviewResult
 import com.getfit.data.ai.buildWorkoutSummary
 import com.getfit.data.db.Curated
 import com.getfit.data.db.TargetEntity
@@ -54,6 +59,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     private val importExportRepo = container.importExportRepo
     private val backupRepo = container.backupRepo
     private val syncRepo = container.syncRepo
+    private val aiGateway = AiGateway(container.secureKeyStore)
 
     val data: StateFlow<AppData> = combine(
         exerciseRepo.exercises, exerciseRepo.logs, progressRepo.sessions,
@@ -75,6 +81,16 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     val hasAiKey: StateFlow<Boolean> =
         container.secureKeyStore.hasKey.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val hasCompatKey: StateFlow<Boolean> =
+        container.secureKeyStore.hasCompatKey.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /** Whether the CONFIGURED provider is ready — what the AI screens gate on, not just the Anthropic key. */
+    val aiReady: StateFlow<Boolean> = combine(settings, hasAiKey, hasCompatKey) { s, anth, _ ->
+        when (s.aiProvider) {
+            PROVIDER_COMPAT -> s.compatBaseUrl.isNotBlank() && s.compatModel.isNotBlank()
+            else -> anth
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _nav = MutableStateFlow(NavState())
     val nav: StateFlow<NavState> = _nav.asStateFlow()
@@ -254,6 +270,11 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun setAiApiKey(key: String) = viewModelScope.launch { container.secureKeyStore.setApiKey(key) }
     fun clearAiApiKey() = viewModelScope.launch { container.secureKeyStore.clear() }
     fun setAiModel(v: String) = viewModelScope.launch { settingsStore.setAiModel(v) }
+    fun setAiProvider(v: String) = viewModelScope.launch { settingsStore.setAiProvider(v) }
+    fun setCompatBaseUrl(v: String) = viewModelScope.launch { settingsStore.setCompatBaseUrl(v) }
+    fun setCompatModel(v: String) = viewModelScope.launch { settingsStore.setCompatModel(v) }
+    fun setCompatApiKey(key: String) = viewModelScope.launch { container.secureKeyStore.setApiKey(key, KeySlot.COMPAT) }
+    fun clearCompatApiKey() = viewModelScope.launch { container.secureKeyStore.clear(KeySlot.COMPAT) }
 
     /** The full brief both AI features share: sessions, bests, targets, trends and training patterns. */
     private suspend fun currentWorkoutSummary(): String {
@@ -266,15 +287,14 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         if (_aiReview.value.loading) return
         _aiReview.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
-            val apiKey = container.secureKeyStore.getApiKey()
-            if (apiKey.isNullOrBlank()) {
-                _aiReview.update { it.copy(loading = false, error = "Add your API key in Settings first.") }
+            aiGateway.missingConfig(settings.value)?.let { msg ->
+                _aiReview.update { it.copy(loading = false, error = msg) }
                 return@launch
             }
             val summary = currentWorkoutSummary()
-            when (val result = AiReviewClient.review(apiKey, settings.value.aiModel, summary)) {
-                is AiReviewResult.Success -> _aiReview.update { it.copy(loading = false, text = result.text, error = null) }
-                is AiReviewResult.Failure -> _aiReview.update { it.copy(loading = false, error = result.message) }
+            when (val result = aiGateway.send(settings.value, aiReviewSystemPrompt(), listOf(textBlock(summary)), AI_REVIEW_MAX_TOKENS)) {
+                is AiResult.Success -> _aiReview.update { it.copy(loading = false, text = result.text, error = null) }
+                is AiResult.Failure -> _aiReview.update { it.copy(loading = false, error = result.message) }
             }
         }
     }
@@ -324,9 +344,8 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         if (!s.consented) { _bodyCheck.update { it.copy(error = "Tick the box to confirm you're okay sending these photos.") }; return }
         _bodyCheck.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
-            val apiKey = container.secureKeyStore.getApiKey()
-            if (apiKey.isNullOrBlank()) {
-                _bodyCheck.update { it.copy(loading = false, error = "Add your API key in Settings first.") }
+            aiGateway.missingConfig(settings.value)?.let { msg ->
+                _bodyCheck.update { it.copy(loading = false, error = msg) }
                 return@launch
             }
             // Encode off the main thread; a 12 MP photo decode is not free. Held in memory only for
@@ -341,7 +360,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 return@launch
             }
             val content = buildBodyAnalysisContent(encoded, s.goal, s.focusArea, currentWorkoutSummary())
-            val result = AnthropicClient.send(apiKey, settings.value.aiModel, bodyAnalysisSystemPrompt(), content, maxTokens = 8000)
+            val result = aiGateway.send(settings.value, bodyAnalysisSystemPrompt(), content, BODY_CHECK_MAX_TOKENS)
             when (result) {
                 is AiResult.Success -> _bodyCheck.update { it.copy(loading = false, text = result.text, error = null) }
                 is AiResult.Failure -> _bodyCheck.update { it.copy(loading = false, error = result.message) }

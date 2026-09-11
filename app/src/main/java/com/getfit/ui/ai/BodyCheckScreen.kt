@@ -49,6 +49,7 @@ import com.getfit.core.ui.ShimmerBox
 import com.getfit.core.ui.msIcon
 import com.getfit.core.ui.pressScale
 import com.getfit.data.ai.BodyGoal
+import com.getfit.data.ai.PROVIDER_COMPAT
 import com.getfit.ui.AppViewModel
 
 /**
@@ -59,7 +60,12 @@ import com.getfit.ui.AppViewModel
 @Composable
 fun BodyCheckScreen(vm: AppViewModel) {
     val state by vm.bodyCheck.collectAsState()
-    val hasKey by vm.hasAiKey.collectAsState()
+    val hasKey by vm.aiReady.collectAsState()
+    val settings by vm.settings.collectAsState()
+    // Named in the consent text so the user knows exactly where the photos go.
+    val providerName = if (settings.aiProvider == PROVIDER_COMPAT) {
+        settings.compatBaseUrl.removePrefix("https://").removePrefix("http://").substringBefore("/").ifBlank { "your AI provider" }
+    } else "Anthropic's API"
 
     // The system Photo Picker: no storage permission, and the app only ever sees the URIs the user
     // hands over — not the whole gallery.
@@ -181,7 +187,7 @@ fun BodyCheckScreen(vm: AppViewModel) {
                     contentAlignment = Alignment.Center,
                 ) { if (state.consented) Icon(msIcon("check"), null, tint = GfColor.OnAccent, modifier = Modifier.size(15.dp)) }
                 Text(
-                    "Send these photos to Anthropic's API using my key. Forge doesn't store them — they're " +
+                    "Send these photos to $providerName using my key. Forge doesn't store them — they're " +
                         "resized, stripped of location and device data, sent once, and discarded.",
                     color = GfColor.TextCue, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.5.sp, lineHeight = 18.sp,
                 )
@@ -222,9 +228,9 @@ private fun SectionTitle(t: String) {
 private fun NoKey(onOpenSettings: () -> Unit) {
     Column(Modifier.padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(msIcon("lock"), null, tint = GfColor.TextFaint, modifier = Modifier.size(40.dp))
-        Text("Add an API key to use the body check", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
+        Text("Set up an AI provider to use the body check", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp))
         Text(
-            "Your photos go to your own AI provider, with your key — nothing is sent until you set that up.",
+            "Your photos go to the AI provider you choose, with your key — nothing is sent until you set that up.",
             color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 13.5.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 8.dp),
         )
         Row(

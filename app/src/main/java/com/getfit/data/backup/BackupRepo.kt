@@ -74,6 +74,9 @@ class BackupRepo(
                 intensity = settings.intensity,
                 onboarded = settings.onboarded,
                 aiModel = settings.aiModel,
+                aiProvider = settings.aiProvider,
+                compatBaseUrl = settings.compatBaseUrl,
+                compatModel = settings.compatModel,
             ),
             plan = plan.map { BackupPlanItem(it.id, it.sets, it.reps) },
             exercises = exercises.map {
@@ -198,6 +201,10 @@ class BackupRepo(
                 settingsStore.setRestDefault(restDefault)
                 settingsStore.setOnboarded(onboarded)
                 settingsStore.setAiModel(aiModel)
+                // Provider config is restored; keys never are (they are secrets and never backed up).
+                settingsStore.setAiProvider(aiProvider)
+                settingsStore.setCompatBaseUrl(compatBaseUrl)
+                settingsStore.setCompatModel(compatModel)
             }
             // Never restore `seeded` from the file. The library on THIS install is already seeded,
             // and a false value would make the next launch re-seed demo history on top of the data

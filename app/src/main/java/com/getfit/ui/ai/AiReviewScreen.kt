@@ -42,7 +42,7 @@ import com.getfit.ui.AppViewModel
 @Composable
 fun AiReviewScreen(vm: AppViewModel) {
     val review by vm.aiReview.collectAsState()
-    val hasKey by vm.hasAiKey.collectAsState()
+    val hasKey by vm.aiReady.collectAsState()
 
     // First open with a key already set and nothing requested yet: kick off automatically.
     LaunchedEffect(Unit) {
@@ -78,11 +78,12 @@ private fun NoKeyState(onOpenSettings: () -> Unit) {
     Column(Modifier.padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(msIcon("lock"), null, tint = GfColor.TextFaint, modifier = Modifier.size(40.dp))
         Text(
-            "Add an API key to use AI review", color = GfColor.Text, fontFamily = SpaceGrotesk,
+            "Set up an AI provider to use AI review", color = GfColor.Text, fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.W700, fontSize = 17.sp, modifier = Modifier.padding(top = 16.dp),
         )
         Text(
-            "Forge sends a summary of your logged workouts to your own AI provider — nothing " +
+            "Forge sends a summary of your logged workouts to the AI provider you choose — Anthropic, " +
+                "OpenAI, Groq, DeepSeek or your own — with your key. Nothing " +
                 "leaves your device until you set this up.",
             color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 13.5.sp,
             lineHeight = 20.sp, modifier = Modifier.padding(top = 8.dp),

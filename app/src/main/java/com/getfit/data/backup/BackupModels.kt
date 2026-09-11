@@ -63,6 +63,9 @@ data class BackupSettings(
     val intensity: String = "Moderate",
     val onboarded: Boolean = true,
     @SerialName("ai_model") val aiModel: String = "claude-opus-5",
+    @SerialName("ai_provider") val aiProvider: String = "anthropic",
+    @SerialName("compat_base_url") val compatBaseUrl: String = "",
+    @SerialName("compat_model") val compatModel: String = "",
 )
 
 @Serializable

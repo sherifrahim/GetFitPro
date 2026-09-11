@@ -17,19 +17,8 @@ private const val SYSTEM_PROMPT =
         "plain language and explain what to do about them; do not re-derive or second-guess them " +
         "from the raw session list."
 
-sealed class AiReviewResult {
-    data class Success(val text: String) : AiReviewResult()
-    data class Failure(val message: String) : AiReviewResult()
-}
+/** The workout-review prompt. The request itself goes through [AiGateway] like everything else. */
+fun aiReviewSystemPrompt(): String = SYSTEM_PROMPT
 
-/**
- * The workout review: sends [buildWorkoutSummary]'s brief and returns the written review. All the
- * HTTP lives in [AnthropicClient]; this is just the prompt.
- */
-object AiReviewClient {
-    suspend fun review(apiKey: String, model: String, workoutSummary: String): AiReviewResult =
-        when (val r = AnthropicClient.send(apiKey, model, SYSTEM_PROMPT, listOf(textBlock(workoutSummary)), maxTokens = 6000)) {
-            is AiResult.Success -> AiReviewResult.Success(r.text)
-            is AiResult.Failure -> AiReviewResult.Failure(r.message)
-        }
-}
+const val AI_REVIEW_MAX_TOKENS = 6000
+const val BODY_CHECK_MAX_TOKENS = 8000

@@ -28,6 +28,12 @@ data class Settings(
     // AI review: the API key itself lives in SecureKeyStore (encrypted), not here — this is just
     // which model to call, a non-secret preference like any other.
     val aiModel: String = "claude-opus-5",
+    // Which backend the AI features talk to: "anthropic" (Messages API) or "compat" (any
+    // OpenAI-compatible Chat Completions endpoint — OpenAI, Groq, DeepSeek, OpenRouter, a self-hosted
+    // Ollama...). The compat key lives in SecureKeyStore under its own slot.
+    val aiProvider: String = "anthropic",
+    val compatBaseUrl: String = "",
+    val compatModel: String = "",
 )
 
 private object Keys {
@@ -40,6 +46,9 @@ private object Keys {
     val ONBOARDED = booleanPreferencesKey("onboarded")
     val SEEDED = booleanPreferencesKey("seeded")
     val AI_MODEL = stringPreferencesKey("aiModel")
+    val AI_PROVIDER = stringPreferencesKey("aiProvider")
+    val COMPAT_BASE_URL = stringPreferencesKey("compatBaseUrl")
+    val COMPAT_MODEL = stringPreferencesKey("compatModel")
     val PLAN = stringPreferencesKey("plan")
     val SESSION = stringPreferencesKey("session")
 }
@@ -56,6 +65,9 @@ class SettingsStore(private val ds: DataStore<Preferences>) {
             onboarded = p[Keys.ONBOARDED] ?: false,
             seeded = p[Keys.SEEDED] ?: false,
             aiModel = p[Keys.AI_MODEL] ?: "claude-opus-5",
+            aiProvider = p[Keys.AI_PROVIDER] ?: "anthropic",
+            compatBaseUrl = p[Keys.COMPAT_BASE_URL] ?: "",
+            compatModel = p[Keys.COMPAT_MODEL] ?: "",
         )
     }
 
@@ -68,6 +80,9 @@ class SettingsStore(private val ds: DataStore<Preferences>) {
     suspend fun setOnboarded(v: Boolean) = ds.edit { it[Keys.ONBOARDED] = v }
     suspend fun setSeeded(v: Boolean) = ds.edit { it[Keys.SEEDED] = v }
     suspend fun setAiModel(v: String) = ds.edit { it[Keys.AI_MODEL] = v }
+    suspend fun setAiProvider(v: String) = ds.edit { it[Keys.AI_PROVIDER] = v }
+    suspend fun setCompatBaseUrl(v: String) = ds.edit { it[Keys.COMPAT_BASE_URL] = v.trim().trimEnd('/') }
+    suspend fun setCompatModel(v: String) = ds.edit { it[Keys.COMPAT_MODEL] = v.trim() }
 
     /** Reset preferences to defaults (proto clearAll). */
     suspend fun resetToDefaults() = ds.edit {
