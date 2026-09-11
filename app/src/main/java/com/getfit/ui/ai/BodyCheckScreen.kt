@@ -193,6 +193,20 @@ fun BodyCheckScreen(vm: AppViewModel) {
                 )
             }
 
+            // Groq's free tier is 8K tokens/minute and it bills every image at a flat 2,048 tokens, so
+            // three or more photos overflow a single request. Say so up front — the provider's 429
+            // would otherwise read as "wait and retry", which does not help here.
+            val onGroq = settings.aiProvider == PROVIDER_COMPAT && settings.compatBaseUrl.contains("groq.com")
+            if (onGroq && state.photos.size > 2) {
+                Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(msIcon("warning"), null, tint = GfColor.Amber, modifier = Modifier.size(16.dp))
+                    Text(
+                        "Groq's free tier fits about 2 photos per request (each counts as 2,048 tokens). " +
+                            "Remove ${state.photos.size - 2} or use another provider for more.",
+                        color = GfColor.Amber, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, lineHeight = 18.sp,
+                    )
+                }
+            }
             val canRun = state.photos.isNotEmpty() && state.consented && !state.loading
             Row(
                 Modifier.padding(top = 16.dp).fillMaxWidth().height(52.dp).pressScale(remember { MutableInteractionSource() }, 0.97f)
