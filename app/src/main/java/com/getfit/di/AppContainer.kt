@@ -54,11 +54,15 @@ class AppContainer(val appContext: Context) {
     val importExportRepo = ImportExportRepo(db.exerciseDao(), db.logDao(), db.sessionDao(), workoutRepo)
     val phoneWearSync = PhoneWearSync(appContext)
 
-    /** Seed the library + demo data on first launch (idempotent). */
+    /** Seed the library on first launch (idempotent); purge old demo rows once on upgraded installs. */
     fun seedOnFirstLaunch() {
         appScope.launch {
             Seeder.seedIfEmpty(appContext, db)
             settingsStore.setSeeded(true)
+            if (!settingsStore.isDemoPurged()) {
+                if (Seeder.purgeDemoData(db) > 0) syncRepo.noteChange()
+                settingsStore.setDemoPurged()
+            }
         }
     }
 

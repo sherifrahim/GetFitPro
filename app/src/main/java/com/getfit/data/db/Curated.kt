@@ -192,7 +192,8 @@ object Curated {
     /** Exercises offered in the "New target" sheet (proto GOAL_EX, L718). */
     val GOAL_EX = listOf("bench", "squat", "ohp", "row", "rdl", "pulldown", "curl", "incline", "swing")
 
-    /** Seed history: exerciseId -> list of [weight, reps, daysAgo] (proto SEED, L719-723). */
+    /** Prototype demo history (proto SEED, L719-723). No longer seeded into the app — kept only as
+     *  the reference values the PR unit tests are written against. */
     val SEED: Map<String, List<Triple<Double, Int, Int>>> = mapOf(
         "bench" to listOf(Triple(85.0, 8, 40), Triple(92.5, 6, 20), Triple(100.0, 5, 4)),
         "squat" to listOf(Triple(110.0, 6, 35), Triple(130.0, 5, 15), Triple(140.0, 3, 6)),
@@ -220,7 +221,7 @@ object Curated {
             "Pick a goal weight and a deadline, then follow your progress. Everything stays private, on your device."),
     )
 
-    /** Demo targets (proto L754): exId, target, start, startedDaysAgo, weeks. */
+    /** Prototype demo targets (proto L754). No longer seeded; see SEED. */
     data class SeedTarget(val id: String, val exId: String, val target: Double, val start: Double, val startedDaysAgo: Int, val weeks: Int)
     val SEED_TARGETS = listOf(
         SeedTarget("t1", "bench", 110.0, 100.0, 4, 8),

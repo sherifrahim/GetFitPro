@@ -50,6 +50,14 @@ interface LogDao {
     @Query("DELETE FROM set_logs WHERE dateMs = :dateMs")
     suspend fun deleteAt(dateMs: Long)
 
+    /** Logs with no session on the same timestamp. Real logs never qualify (saveSession and import
+     *  both stamp them with the session's dateMs), so this isolates the old seeded demo rows. */
+    @Query("SELECT * FROM set_logs WHERE dateMs NOT IN (SELECT dateMs FROM sessions)")
+    suspend fun orphans(): List<SetLogEntity>
+
+    @Query("DELETE FROM set_logs WHERE rowId IN (:rowIds)")
+    suspend fun deleteRows(rowIds: List<Long>)
+
     @Query("DELETE FROM set_logs")
     suspend fun clear()
 }

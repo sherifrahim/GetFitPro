@@ -229,6 +229,16 @@ fun ProgressScreen(vm: AppViewModel) {
             Text("Personal records", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
             Icon(msIcon("emoji_events"), null, tint = GfColor.Amber, modifier = Modifier.size(20.dp))
         }
+        if (records.isEmpty()) {
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.Surface).border(1.dp, GfColor.Hairline10, RoundedCornerShape(20.dp)).padding(vertical = 28.dp, horizontal = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(msIcon("military_tech"), null, tint = GfColor.TextFaint, modifier = Modifier.size(30.dp))
+                Text("No records yet", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
+                Text("Your best set for every exercise shows up here as you log workouts.", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.5.sp, lineHeight = 19.sp, textAlign = TextAlign.Center)
+            }
+        }
         records.forEach { (ex, b, _) ->
             val recent = (now - b.dateMs) < 14 * DAY_MS
             Row(

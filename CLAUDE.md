@@ -21,7 +21,7 @@ The Android app (Kotlin + Jetpack Compose) is otherwise built to look and behave
 > exercises → detail → builder → guided session → progress → settings, hydrated from Room +
 > DataStore. Since then: AI review, CSV import/export, cloud-sync groundwork (inert), a Wear OS
 > companion, rest-timer feedback, and the trend insight. Unit tests live in `app/src/test/…`
-> (**136 tests**). The build order/spec live in `docs/superpowers/`.
+> (**185 tests**). The build order/spec live in `docs/superpowers/`.
 
 ## UI architecture note (important)
 
@@ -144,9 +144,12 @@ prototype's outputs:
 - **Session state machine** (`startSession` → `tick` → `doneSet` → `advanceFromRest` → `endSession`):
   work/rest phases, 1s ticker, PR checked on every logged set, volume accumulates (weighted only),
   a `history` record is written on end. Weight prefilled from last logged set, else `DEFAULTW`, else 20.
-- **Persistence**: seed-on-first-launch (`SEED`, `DEFAULTW`, `DEFAULT_PLAN`, 2 demo targets);
-  "Clear all data" wipes and resets to the same seed. Prototype uses `localStorage getfit_v1`;
-  Android uses Room + DataStore.
+- **Persistence**: the prototype seeded demo history (`SEED`), `DEFAULTW`, `DEFAULT_PLAN` and 2 demo
+  targets on first launch. **The Android app deliberately does not seed demo history or targets any
+  more** (dropped once it ran on real devices): first run is the exercise library + the default
+  routines + an empty log. `Curated.SEED` survives only as the reference data for `PrTest`. "Clear all
+  data" wipes user rows and resets routines/preferences; the library stays. Prototype uses
+  `localStorage getfit_v1`; Android uses Room + DataStore.
 
 ## Data & media
 
@@ -191,7 +194,7 @@ Two modules: `:app` (phone, min SDK 26) and `:wear` (Wear OS, min SDK 30). Alway
 ```bash
 ./gradlew :app:assembleDebug :wear:assembleDebug   # build both (do this first)
 ./gradlew :app:installDebug                        # install phone app
-./gradlew :app:testDebugUnitTest                   # JVM unit tests (136)
+./gradlew :app:testDebugUnitTest                   # JVM unit tests (185)
 ./gradlew :app:testDebugUnitTest --tests "com.getfit.domain.PrTest"   # single test class
 ./gradlew :app:connectedDebugAndroidTest           # instrumented/Compose UI tests
 ./gradlew :app:lintDebug                           # Android lint

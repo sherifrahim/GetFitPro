@@ -80,6 +80,7 @@ private object Keys {
     val KEEP_AWAKE = booleanPreferencesKey("keepAwake")
     val PR_NOTIFY = booleanPreferencesKey("prNotify")
     val WEEK_MONDAY = booleanPreferencesKey("weekStartsMonday")
+    val DEMO_PURGED = booleanPreferencesKey("demoPurged")
     val PLAN = stringPreferencesKey("plan") // legacy single plan: read once by RoutinesStore, then removed
     val ROUTINES = stringPreferencesKey("routines")
     val SESSION = stringPreferencesKey("session")
@@ -120,6 +121,9 @@ class SettingsStore(private val ds: DataStore<Preferences>) {
     suspend fun setIntensity(v: String) = ds.edit { it[Keys.INTENSITY] = v; it[Keys.REST_DEFAULT] = Curated.INTENSITY[v]?.rest ?: 60 }
     suspend fun setOnboarded(v: Boolean) = ds.edit { it[Keys.ONBOARDED] = v }
     suspend fun setSeeded(v: Boolean) = ds.edit { it[Keys.SEEDED] = v }
+    /** One-shot flag for Seeder.purgeDemoData: true once an install has been cleaned of demo rows. */
+    suspend fun isDemoPurged(): Boolean = ds.data.first()[Keys.DEMO_PURGED] ?: false
+    suspend fun setDemoPurged() = ds.edit { it[Keys.DEMO_PURGED] = true }
     suspend fun setAiModel(v: String) = ds.edit { it[Keys.AI_MODEL] = v }
     suspend fun setAiProvider(v: String) = ds.edit { it[Keys.AI_PROVIDER] = v }
     suspend fun setCompatBaseUrl(v: String) = ds.edit { it[Keys.COMPAT_BASE_URL] = v.trim().trimEnd('/') }
