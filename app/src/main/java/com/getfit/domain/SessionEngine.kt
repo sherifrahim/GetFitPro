@@ -25,6 +25,8 @@ data class SessionItem(
     val reps: String,
     val bw: Boolean,
     val suggestW: Double,
+    /** Equipment string from the library; "Barbell" turns on the plate calculator and warm-up ramp. */
+    val equipment: String = "",
 )
 
 @Serializable

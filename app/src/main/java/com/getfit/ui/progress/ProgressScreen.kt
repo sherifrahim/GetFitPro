@@ -55,6 +55,8 @@ import com.getfit.domain.targetPct
 import com.getfit.domain.weekAgg
 import com.getfit.domain.weekStartLocal
 import com.getfit.domain.fmtDur
+import com.getfit.domain.LoggedSet
+import com.getfit.domain.prHistory
 import com.getfit.domain.todayWeekIndex
 import com.getfit.domain.weekDayLetters
 import com.getfit.ui.AppViewModel
@@ -210,6 +212,47 @@ fun ProgressScreen(vm: AppViewModel) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text(if (b.bodyweight) "${b.reps} reps" else "${Units.fmtDisplay(b.weight, units)} $units × ${b.reps}", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 14.sp)
                     if (recent) Text("NEW PR", color = GfColor.Amber, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 9.5.sp, modifier = Modifier.padding(top = 2.dp))
+                }
+            }
+        }
+
+
+        // PR history — every time a best moved, newest first (the toast you can browse later).
+        val prEvents = remember(data.logs, data.exercises) {
+            prHistory(data.logs.map { LoggedSet(it.exerciseId, it.weight, it.reps, it.dateMs) }) { exId ->
+                data.exercise(exId)?.let { isBW(it.equipment, it.reps) } ?: false
+            }
+        }
+        if (prEvents.isNotEmpty()) {
+            var showAllPrs by remember { mutableStateOf(false) }
+            Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("PR history", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
+                Text("${prEvents.size} records", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp)
+            }
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(GfColor.Surface).border(1.dp, GfColor.Hairline06, RoundedCornerShape(18.dp))) {
+                (if (showAllPrs) prEvents else prEvents.take(6)).forEachIndexed { i, e ->
+                    val ex = data.exercise(e.exerciseId)
+                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(GfColor.Hairline06.copy(alpha = 0.5f)))
+                    Row(
+                        Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, indication = null) { if (ex != null) vm.openDetail(ex.id) }.padding(horizontal = 14.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(msIcon("military_tech"), null, tint = GfColor.Amber, modifier = Modifier.size(18.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(ex?.name ?: e.exerciseId, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W600, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(relDay(e.dateMs, now) + " · " + fullDate(e.dateMs), color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.5.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(if (e.bodyweight) "${e.reps} reps" else "${Units.fmtDisplay(Units.toDisplay(e.weight, units), units)} $units × ${e.reps}", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 13.5.sp)
+                            if (!e.bodyweight) Text("e1RM ${Units.toDisplay(e.e1rm.toDouble(), units).roundToInt()}", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.sp)
+                        }
+                    }
+                }
+                if (prEvents.size > 6) {
+                    Text(
+                        if (showAllPrs) "Show fewer" else "Show all ${prEvents.size}", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.sp,
+                        modifier = Modifier.fillMaxWidth().clickable(remember { MutableInteractionSource() }, indication = null) { showAllPrs = !showAllPrs }.padding(vertical = 12.dp), textAlign = TextAlign.Center,
+                    )
                 }
             }
         }

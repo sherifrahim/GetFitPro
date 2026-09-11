@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -67,6 +68,7 @@ import com.getfit.domain.LoggedSet
 import com.getfit.domain.TrendVerdict
 import com.getfit.domain.Units
 import com.getfit.domain.analyzeTrend
+import com.getfit.domain.progressSeries
 import com.getfit.domain.isBW
 import com.getfit.domain.targetDaysLeft
 import com.getfit.domain.targetPct
@@ -169,6 +171,10 @@ fun DetailScreen(vm: AppViewModel, id: String) {
                 }
 
                 if (trend.verdict != TrendVerdict.INSUFFICIENT_DATA || cnt > 0) TrendCard(trend)
+                val series = remember(data.logs, id, bw) {
+                    progressSeries(data.logs.filter { it.exerciseId == id }.map { LoggedSet(it.exerciseId, it.weight, it.reps, it.dateMs) }, bw)
+                }
+                if (series.isNotEmpty()) ProgressChart(series, bw, units)
 
                 Text("How to perform", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp, modifier = Modifier.padding(top = 24.dp, bottom = 12.dp))
                 cues.forEachIndexed { i, c ->
@@ -321,5 +327,62 @@ private fun ago(dateMs: Long, now: Long): String {
     val n = ((now - dateMs).toDouble() / DAY_MS).roundToInt()
     return when {
         n <= 0 -> "Today"; n == 1 -> "1d ago"; else -> "${n}d ago"
+    }
+}
+
+/**
+ * Per-exercise progress: the day's top set over time (weight, or reps for bodyweight), the series
+ * [analyzeTrend] classifies. Needs two sessions to draw a line; one session shows a single dot.
+ */
+@Composable
+private fun ProgressChart(series: List<com.getfit.domain.ProgressPoint>, bw: Boolean, units: String) {
+    if (series.isEmpty()) return
+    val values = series.map { if (bw) it.value else Units.toDisplay(it.value, units) }
+    val lo = values.min(); val hi = values.max()
+    val df = remember { java.text.SimpleDateFormat("d MMM", java.util.Locale.getDefault()) }
+    Column(
+        Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(GfColor.Surface)
+            .border(1.dp, GfColor.Hairline06, RoundedCornerShape(18.dp)).padding(16.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Progress", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
+            Text(
+                if (bw) "top reps · ${series.size} sessions" else "top weight ($units) · ${series.size} sessions",
+                color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.5.sp,
+            )
+        }
+        Row(Modifier.fillMaxWidth().height(120.dp).padding(top = 12.dp)) {
+            androidx.compose.foundation.Canvas(Modifier.weight(1f).fillMaxHeight()) {
+                val w = size.width; val h = size.height
+                val n = values.size
+                val range = (hi - lo).takeIf { it > 0 } ?: 1.0
+                fun x(i: Int) = if (n == 1) w / 2 else i / (n - 1).toFloat() * (w - 8f) + 4f
+                fun y(v: Double) = (h - 6f) - ((v - lo) / range * (h - 12f)).toFloat()
+                // grid
+                listOf(0f, 0.5f, 1f).forEach { f ->
+                    drawLine(Color(0x1AFFFFFF), Offset(0f, 6f + f * (h - 12f)), Offset(w, 6f + f * (h - 12f)), strokeWidth = 1f)
+                }
+                if (n > 1) {
+                    val line = androidx.compose.ui.graphics.Path().apply {
+                        values.forEachIndexed { i, v -> if (i == 0) moveTo(x(i), y(v)) else lineTo(x(i), y(v)) }
+                    }
+                    val area = androidx.compose.ui.graphics.Path().apply { addPath(line); lineTo(x(n - 1), h); lineTo(x(0), h); close() }
+                    drawPath(area, GfColor.Accent.copy(alpha = 0.15f))
+                    drawPath(line, GfColor.Accent, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                }
+                values.forEachIndexed { i, v ->
+                    drawCircle(GfColor.Background, radius = 7f, center = Offset(x(i), y(v)))
+                    drawCircle(GfColor.Accent, radius = 4.5f, center = Offset(x(i), y(v)))
+                }
+            }
+            Column(Modifier.padding(start = 8.dp).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+                Text(if (bw) "${hi.toInt()}" else Units.fmtDisplay(hi, units), color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.sp)
+                Text(if (bw) "${lo.toInt()}" else Units.fmtDisplay(lo, units), color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.sp)
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(df.format(java.util.Date(series.first().dayMs)), color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.sp)
+            if (series.size > 1) Text(df.format(java.util.Date(series.last().dayMs)), color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.sp)
+        }
     }
 }

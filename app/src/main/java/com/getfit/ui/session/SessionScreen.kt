@@ -45,6 +45,10 @@ import com.getfit.core.ui.ProgressRing
 import com.getfit.core.ui.msIcon
 import com.getfit.core.ui.pressScale
 import com.getfit.domain.Phase
+import com.getfit.domain.Plates
+import com.getfit.domain.Units
+import com.getfit.domain.platesFor
+import com.getfit.domain.warmupRamp
 import com.getfit.domain.SessionState
 import com.getfit.domain.fmtClock
 import com.getfit.domain.fmtVol
@@ -144,6 +148,26 @@ private fun ActiveView(s: SessionState, units: String, vm: AppViewModel) {
             }
             Text("Up next · $nextName", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp))
         } else {
+            // Load tools — barbell lifts only: which plates make the current weight, and (first set
+            // only) a warm-up ramp to it. Both are pure functions of the weight on screen.
+            if (!it.bw && it.equipment == "Barbell") {
+                val bar = Plates.barFor(units)
+                val load = platesFor(s.curW, bar, Plates.setFor(units))
+                val ramp = if (s.setNum == 1) warmupRamp(s.curW, bar, Units.step(units)) else emptyList()
+                Column(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (load != null) {
+                        val plates = if (load.perSide.isEmpty()) "empty bar" else load.perSide.joinToString(" · ") { fmtW(it) }
+                        val tail = if (!load.exact) "  (+${fmtW(load.remainder)} short)" else ""
+                        Text("Per side  $plates$tail", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp)
+                    }
+                    if (ramp.isNotEmpty()) {
+                        Text(
+                            "Warm-up  " + ramp.joinToString(" · ") { w -> "${fmtW(w.weight)}×${w.reps}" },
+                            color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp),
+                        )
+                    }
+                }
+            }
             Row(Modifier.fillMaxWidth().padding(bottom = 11.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (!it.bw) {
                     StepperCard(label = "Weight", value = fmtW(s.curW), unit = units, prBadge = prPace(s), modifier = Modifier.weight(1f), onDec = { tick(); ctrl.decW() }, onInc = { tick(); ctrl.incW() })

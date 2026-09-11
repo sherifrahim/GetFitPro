@@ -56,3 +56,20 @@ fun analyzeTrend(logs: List<LoggedSet>, bodyweight: Boolean, maxPoints: Int = 6)
 }
 
 private fun pct(v: Double): String = "${Math.round(v)}%"
+
+/** One point on an exercise's progress chart: the day's top set (weight, or reps for bodyweight). */
+data class ProgressPoint(val dayMs: Long, val value: Double, val e1rm: Int)
+
+/**
+ * The per-exercise progress series a chart draws — the same "top set per day" reduction
+ * [analyzeTrend] classifies, kept whole (up to [maxPoints], oldest first) instead of just its ends.
+ */
+fun progressSeries(logs: List<LoggedSet>, bodyweight: Boolean, maxPoints: Int = 30): List<ProgressPoint> =
+    logs.groupBy { floorDayLocal(it.dateMs) }.entries.sortedBy { it.key }.takeLast(maxPoints).map { (day, sets) ->
+        if (bodyweight) {
+            ProgressPoint(day, sets.maxOf { it.reps }.toDouble(), 0)
+        } else {
+            val top = sets.reduce { a, b -> if (b.weight > a.weight || (b.weight == a.weight && b.reps > a.reps)) b else a }
+            ProgressPoint(day, top.weight, e1rm(top.weight, top.reps))
+        }
+    }

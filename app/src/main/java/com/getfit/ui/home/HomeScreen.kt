@@ -51,6 +51,8 @@ import com.getfit.domain.todayWeekIndex
 import com.getfit.domain.weekDayLetters
 import com.getfit.domain.weekAgg
 import com.getfit.domain.weekStartLocal
+import com.getfit.domain.recoveryByMuscle
+import com.getfit.domain.suggestRoutine
 import com.getfit.ui.AppData
 import com.getfit.ui.AppViewModel
 import com.getfit.ui.builder.estMinutes
@@ -123,11 +125,21 @@ fun HomeScreen(vm: AppViewModel) {
             onStart = { vm.startCurrentRoutine() },
         )
 
+        // Recovery pick: which routine hits the freshest muscles, from the user's own log. Only shown
+        // when it disagrees with the rotation, so it reads as a nudge rather than a second list.
+        val suggestion = remember(data.sessions, data.sessionSets, data.routines, data.exercises, now / 3_600_000) {
+            val recovery = recoveryByMuscle(
+                data.sessions.associate { it.id to it.dateMs }, data.sessionSets.map { it.sessionId to it.exerciseId },
+                { id -> data.exercise(id)?.muscle }, now,
+            )
+            suggestRoutine(data.routines.map { r -> r.id to r.items.map { it.id } }, recovery, { id -> data.exercise(id)?.muscle }, now)
+                ?.takeIf { it.routineId != routine?.id }?.let { s -> data.routine(s.routineId)?.let { it to s.reason } }
+        }
         val upcoming = data.routinesData.upcoming
-        if (upcoming.isNotEmpty()) {
+        if (upcoming.isNotEmpty() || suggestion != null) {
             Spacer(Modifier.height(12.dp))
             UpNextStrip(
-                upcoming = upcoming, data = data, restDefault = settings.restDefault,
+                upcoming = upcoming, data = data, restDefault = settings.restDefault, suggestion = suggestion,
                 onPick = { vm.setCurrentRoutine(it) }, onSeeAll = { vm.selectTab(com.getfit.ui.TAB_BUILD) },
             )
         }
@@ -266,7 +278,7 @@ private fun CategoryCard(name: String, count: Int, onClick: () -> Unit) {
  * workout (the same thing the watch's Idle screen does) — the Home card and the watch both follow.
  */
 @Composable
-private fun UpNextStrip(upcoming: List<Routine>, data: AppData, restDefault: Int, onPick: (String) -> Unit, onSeeAll: () -> Unit) {
+private fun UpNextStrip(upcoming: List<Routine>, data: AppData, restDefault: Int, suggestion: Pair<Routine, String>?, onPick: (String) -> Unit, onSeeAll: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(GfColor.Surface)
             .border(1.dp, GfColor.Hairline06, RoundedCornerShape(22.dp)).padding(horizontal = 18.dp, vertical = 14.dp),
@@ -274,6 +286,21 @@ private fun UpNextStrip(upcoming: List<Routine>, data: AppData, restDefault: Int
         Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Up next", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.5.sp)
             Text("Routines", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp, modifier = Modifier.clickable(onClick = onSeeAll))
+        }
+        suggestion?.let { (r, why) ->
+            val press = remember { MutableInteractionSource() }
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 8.dp).clip(RoundedCornerShape(14.dp)).background(GfColor.AccentFill12)
+                    .clickable(press, indication = null) { onPick(r.id) }.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(msIcon("bolt"), null, tint = GfColor.Accent, modifier = Modifier.size(18.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Recovery pick: ${r.name}", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 13.sp)
+                    Text(why, color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.5.sp)
+                }
+                Text("Use", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 12.sp)
+            }
         }
         upcoming.take(3).forEachIndexed { i, r ->
             val press = remember { MutableInteractionSource() }
