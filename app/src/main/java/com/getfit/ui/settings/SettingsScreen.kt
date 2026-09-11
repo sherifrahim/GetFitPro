@@ -232,7 +232,7 @@ private fun AiKeySection(hasAiKey: Boolean, model: String, vm: AppViewModel) {
 
         Text("MODEL", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 10.5.sp, letterSpacing = 1.sp, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
         GfTextField(
-            value = modelInput, onValueChange = { modelInput = it }, placeholder = "claude-sonnet-4-5", masked = false,
+            value = modelInput, onValueChange = { modelInput = it }, placeholder = "claude-opus-5", masked = false,
         )
         LaunchedEffect(modelInput) {
             // Debounce-free: this is a rarely-typed field, save on every change is fine.

@@ -165,6 +165,24 @@ fun ProgressScreen(vm: AppViewModel) {
             Icon(msIcon("chevron_right"), null, tint = GfColor.OnAccentSub, modifier = Modifier.size(20.dp))
         }
 
+        // Body check entry point — a surface card rather than a second accent gradient, so the two
+        // AI features read as siblings without competing.
+        Row(
+            Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.Surface)
+                .border(1.dp, GfColor.Hairline06, RoundedCornerShape(20.dp))
+                .clickable(remember { MutableInteractionSource() }, indication = null) { vm.openBodyCheck() }.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(GfColor.AccentFill12), contentAlignment = Alignment.Center) {
+                Icon(msIcon("exercise"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text("Body check", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
+                Text("Photos in, a physique read and training changes out", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+            Icon(msIcon("chevron_right"), null, tint = GfColor.TextFaint, modifier = Modifier.size(20.dp))
+        }
+
         // personal records
         Row(Modifier.fillMaxWidth().padding(top = 26.dp, bottom = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Personal records", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)

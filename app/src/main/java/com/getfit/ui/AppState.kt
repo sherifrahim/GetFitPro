@@ -29,6 +29,7 @@ data class NavState(
     val settingsOpen: Boolean = false,
     val goalOpen: Boolean = false,
     val aiReviewOpen: Boolean = false,
+    val bodyCheckOpen: Boolean = false,
     val booted: Boolean = false,
     val charted: Boolean = false,
     val confirmClear: Boolean = false,
@@ -79,3 +80,21 @@ const val TAB_HOME = "home"
 const val TAB_EXERCISES = "exercises"
 const val TAB_BUILD = "build"
 const val TAB_PROGRESS = "progress"
+
+/** One photo chosen for the body check: the picker URI (never persisted) and which view it shows. */
+data class PickedPhoto(val uri: android.net.Uri, val view: com.getfit.data.ai.PhotoView)
+
+/**
+ * State for the body check overlay. [consented] must be re-ticked every time the screen is opened —
+ * it is reset on close on purpose, because the photos leave the device and one-time consent must
+ * not silently become standing consent.
+ */
+data class BodyCheckUiState(
+    val photos: List<PickedPhoto> = emptyList(),
+    val goal: com.getfit.data.ai.BodyGoal = com.getfit.data.ai.BodyGoal.BUILD_MUSCLE,
+    val focusArea: String = "",
+    val consented: Boolean = false,
+    val loading: Boolean = false,
+    val text: String? = null,
+    val error: String? = null,
+)

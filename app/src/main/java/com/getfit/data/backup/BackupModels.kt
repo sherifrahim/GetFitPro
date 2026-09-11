@@ -62,7 +62,7 @@ data class BackupSettings(
     @SerialName("rest_default") val restDefault: Int = 60,
     val intensity: String = "Moderate",
     val onboarded: Boolean = true,
-    @SerialName("ai_model") val aiModel: String = "claude-sonnet-4-5",
+    @SerialName("ai_model") val aiModel: String = "claude-opus-5",
 )
 
 @Serializable

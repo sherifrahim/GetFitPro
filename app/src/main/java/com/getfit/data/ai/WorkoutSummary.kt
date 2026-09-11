@@ -2,10 +2,14 @@ package com.getfit.data.ai
 
 import com.getfit.data.db.ExerciseEntity
 import com.getfit.data.db.SessionEntity
+import com.getfit.data.db.SessionSetEntity
 import com.getfit.data.db.SetLogEntity
 import com.getfit.data.db.TargetEntity
 import com.getfit.domain.Best
 import com.getfit.domain.LoggedSet
+import com.getfit.domain.MuscleSet
+import com.getfit.domain.analyzePatterns
+import com.getfit.domain.describePatterns
 import com.getfit.domain.SessionRecord
 import com.getfit.domain.TrendVerdict
 import com.getfit.domain.Units
@@ -35,6 +39,7 @@ fun buildWorkoutSummary(
     exercises: List<ExerciseEntity>,
     units: String,
     logs: List<SetLogEntity> = emptyList(),
+    sessionSets: List<SessionSetEntity> = emptyList(),
 ): String {
     if (sessions.isEmpty()) return "No workouts logged yet."
 
@@ -43,10 +48,8 @@ fun buildWorkoutSummary(
     val df = SimpleDateFormat("MMM d", Locale.US)
     val sorted = sessions.sortedByDescending { it.dateMs }
     val streak = streakCount(sessions.map { it.dateMs }, now, ::floorDayLocal)
-    val thisWeek = weekAgg(
-        sessions.map { SessionRecord(it.id, it.dateMs, it.name, it.durationSec, it.totalSets, it.volume, it.prs) },
-        weekStartLocal(now),
-    )
+    val records = sessions.map { SessionRecord(it.id, it.dateMs, it.name, it.durationSec, it.totalSets, it.volume, it.prs) }
+    val thisWeek = weekAgg(records, weekStartLocal(now))
 
     val sb = StringBuilder()
     sb.appendLine("Workout log summary (most recent first). ${sessions.size} sessions logged total, current streak $streak day${if (streak == 1) "" else "s"}.")
@@ -54,6 +57,20 @@ fun buildWorkoutSummary(
         "This week so far: ${thisWeek.workouts} workout${if (thisWeek.workouts == 1) "" else "s"}, " +
             "${fmtDur(thisWeek.durationSec)} total time, ${fmtVol(Units.volDisplay(thisWeek.totalVolume, units))} $units volume.",
     )
+    sb.appendLine()
+
+    // Pre-computed training patterns (domain/Patterns.kt): schedule, skipped weeks, gaps, day-of-
+    // week habits, session pace, volume direction and muscle balance — handed over as facts so the
+    // model advises on the pattern instead of reconstructing it from the session list.
+    val sessionDate = sessions.associate { it.id to it.dateMs }
+    val muscleSets = sessionSets.mapNotNull { ss ->
+        val date = sessionDate[ss.sessionId] ?: return@mapNotNull null
+        val muscle = byId[ss.exerciseId]?.muscle ?: return@mapNotNull null
+        MuscleSet(date, muscle)
+    }
+    val patterns = analyzePatterns(records, now, muscleSets = muscleSets)
+    sb.appendLine("Training patterns (pre-computed, not for you to recompute):")
+    sb.appendLine(describePatterns(patterns, units))
     sb.appendLine()
 
     sb.appendLine("Last ${minOf(10, sorted.size)} sessions:")

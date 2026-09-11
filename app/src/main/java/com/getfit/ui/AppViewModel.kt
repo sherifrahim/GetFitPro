@@ -4,7 +4,14 @@ import android.content.ContentResolver
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.getfit.data.ai.AiResult
 import com.getfit.data.ai.AiReviewClient
+import com.getfit.data.ai.AnthropicClient
+import com.getfit.data.ai.BodyGoal
+import com.getfit.data.ai.ImageEncoder
+import com.getfit.data.ai.PhotoView
+import com.getfit.data.ai.bodyAnalysisSystemPrompt
+import com.getfit.data.ai.buildBodyAnalysisContent
 import com.getfit.data.ai.AiReviewResult
 import com.getfit.data.ai.buildWorkoutSummary
 import com.getfit.data.db.Curated
@@ -34,6 +41,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Four views plus one close-up is plenty; more only adds tokens without adding information. */
+private const val MAX_BODY_PHOTOS = 5
 
 class AppViewModel(private val container: AppContainer) : ViewModel() {
 
@@ -71,6 +81,9 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _aiReview = MutableStateFlow(AiReviewUiState())
     val aiReview: StateFlow<AiReviewUiState> = _aiReview.asStateFlow()
+
+    private val _bodyCheck = MutableStateFlow(BodyCheckUiState())
+    val bodyCheck: StateFlow<BodyCheckUiState> = _bodyCheck.asStateFlow()
 
     private val _backup = MutableStateFlow(BackupUiState())
     val backup: StateFlow<BackupUiState> = _backup.asStateFlow()
@@ -242,6 +255,13 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun clearAiApiKey() = viewModelScope.launch { container.secureKeyStore.clear() }
     fun setAiModel(v: String) = viewModelScope.launch { settingsStore.setAiModel(v) }
 
+    /** The full brief both AI features share: sessions, bests, targets, trends and training patterns. */
+    private suspend fun currentWorkoutSummary(): String {
+        val d = data.value
+        val sessionSets = withContext(Dispatchers.IO) { container.db.sessionDao().allSetsOnce() }
+        return buildWorkoutSummary(d.sessions, d.targets, d.bestMap, d.exercises, settings.value.units, d.logs, sessionSets)
+    }
+
     fun runAiReview() {
         if (_aiReview.value.loading) return
         _aiReview.update { it.copy(loading = true, error = null) }
@@ -251,11 +271,80 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 _aiReview.update { it.copy(loading = false, error = "Add your API key in Settings first.") }
                 return@launch
             }
-            val d = data.value
-            val summary = buildWorkoutSummary(d.sessions, d.targets, d.bestMap, d.exercises, settings.value.units, d.logs)
+            val summary = currentWorkoutSummary()
             when (val result = AiReviewClient.review(apiKey, settings.value.aiModel, summary)) {
                 is AiReviewResult.Success -> _aiReview.update { it.copy(loading = false, text = result.text, error = null) }
                 is AiReviewResult.Failure -> _aiReview.update { it.copy(loading = false, error = result.message) }
+            }
+        }
+    }
+
+    // ---- body check (photos -> physique assessment + training changes) ----
+    fun openBodyCheck() = _nav.update { it.copy(bodyCheckOpen = true) }
+
+    /** Closing drops the photos and the consent; the last result text is kept for re-reading. */
+    fun closeBodyCheck() {
+        _nav.update { it.copy(bodyCheckOpen = false) }
+        _bodyCheck.update { it.copy(photos = emptyList(), consented = false, error = null) }
+    }
+
+    /** Assigns views in the natural order Front, Back, Left, Right, then "Specific area". */
+    fun bodyCheckAddPhotos(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        _bodyCheck.update { s ->
+            val existing = s.photos
+            val room = (MAX_BODY_PHOTOS - existing.size).coerceAtLeast(0)
+            val views = PhotoView.values()
+            val added = uris.take(room).mapIndexed { i, uri ->
+                PickedPhoto(uri, views.getOrElse(existing.size + i) { PhotoView.DETAIL })
+            }
+            s.copy(photos = existing + added, error = null)
+        }
+    }
+
+    fun bodyCheckRemovePhoto(index: Int) = _bodyCheck.update { s ->
+        s.copy(photos = s.photos.filterIndexed { i, _ -> i != index })
+    }
+
+    fun bodyCheckCycleView(index: Int) = _bodyCheck.update { s ->
+        val views = PhotoView.values()
+        s.copy(photos = s.photos.mapIndexed { i, p ->
+            if (i == index) p.copy(view = views[(p.view.ordinal + 1) % views.size]) else p
+        })
+    }
+
+    fun bodyCheckSetGoal(g: BodyGoal) = _bodyCheck.update { it.copy(goal = g) }
+    fun bodyCheckSetFocus(v: String) = _bodyCheck.update { it.copy(focusArea = v) }
+    fun bodyCheckSetConsent(v: Boolean) = _bodyCheck.update { it.copy(consented = v) }
+
+    fun runBodyCheck() {
+        val s = _bodyCheck.value
+        if (s.loading) return
+        if (s.photos.isEmpty()) { _bodyCheck.update { it.copy(error = "Add at least one photo.") }; return }
+        if (!s.consented) { _bodyCheck.update { it.copy(error = "Tick the box to confirm you're okay sending these photos.") }; return }
+        _bodyCheck.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            val apiKey = container.secureKeyStore.getApiKey()
+            if (apiKey.isNullOrBlank()) {
+                _bodyCheck.update { it.copy(loading = false, error = "Add your API key in Settings first.") }
+                return@launch
+            }
+            // Encode off the main thread; a 12 MP photo decode is not free. Held in memory only for
+            // the duration of this request.
+            val results = withContext(Dispatchers.IO) {
+                s.photos.map { p -> p.view to ImageEncoder.encode(container.appContext, p.uri) }
+            }
+            val encoded = results.mapNotNull { (view, r) -> r.getOrNull()?.let { view to it } }
+            if (encoded.isEmpty()) {
+                val why = results.firstNotNullOfOrNull { it.second.exceptionOrNull()?.message }
+                _bodyCheck.update { it.copy(loading = false, error = "Couldn't read those photos" + (why?.let { ": $it" } ?: ".")) }
+                return@launch
+            }
+            val content = buildBodyAnalysisContent(encoded, s.goal, s.focusArea, currentWorkoutSummary())
+            val result = AnthropicClient.send(apiKey, settings.value.aiModel, bodyAnalysisSystemPrompt(), content, maxTokens = 8000)
+            when (result) {
+                is AiResult.Success -> _bodyCheck.update { it.copy(loading = false, text = result.text, error = null) }
+                is AiResult.Failure -> _bodyCheck.update { it.copy(loading = false, error = result.message) }
             }
         }
     }

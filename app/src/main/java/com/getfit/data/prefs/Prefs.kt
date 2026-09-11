@@ -27,7 +27,7 @@ data class Settings(
     val seeded: Boolean = false,
     // AI review: the API key itself lives in SecureKeyStore (encrypted), not here — this is just
     // which model to call, a non-secret preference like any other.
-    val aiModel: String = "claude-sonnet-4-5",
+    val aiModel: String = "claude-opus-5",
 )
 
 private object Keys {
@@ -55,7 +55,7 @@ class SettingsStore(private val ds: DataStore<Preferences>) {
             intensity = p[Keys.INTENSITY] ?: "Moderate",
             onboarded = p[Keys.ONBOARDED] ?: false,
             seeded = p[Keys.SEEDED] ?: false,
-            aiModel = p[Keys.AI_MODEL] ?: "claude-sonnet-4-5",
+            aiModel = p[Keys.AI_MODEL] ?: "claude-opus-5",
         )
     }
 

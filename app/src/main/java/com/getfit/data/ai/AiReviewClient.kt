@@ -1,51 +1,21 @@
 package com.getfit.data.ai
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
-
-private const val ANTHROPIC_ENDPOINT = "https://api.anthropic.com/v1/messages"
-private const val ANTHROPIC_VERSION = "2023-06-01"
-
 private const val SYSTEM_PROMPT =
     "You are a knowledgeable, direct strength-training coach reviewing a lifter's logged " +
-        "workout history from their Forge app. Give a short, practical review: what's trending " +
-        "well, what looks stalled or inconsistent, and 2-4 concrete, specific suggestions for the " +
-        "next few weeks (progression, volume, recovery, exercise selection). Be honest and " +
-        "specific, referencing the actual numbers given rather than generic advice. If a " +
-        "'Trend classification' section is present, treat those verdicts (improving/plateaued/" +
-        "declining) as already-computed facts — reference them in plain language and explain what " +
-        "to do about them, don't re-derive or second-guess the classification itself from the raw " +
-        "numbers. No filler, no disclaimers about not being a doctor. Plain text, a few short " +
-        "paragraphs, no markdown."
-
-@Serializable
-private data class AnthropicMessage(val role: String, val content: String)
-
-@Serializable
-private data class AnthropicRequest(
-    val model: String,
-    @SerialName("max_tokens") val maxTokens: Int,
-    val system: String,
-    val messages: List<AnthropicMessage>,
-)
-
-@Serializable
-private data class AnthropicContentBlock(val type: String = "", val text: String? = null)
-
-@Serializable
-private data class AnthropicError(val type: String? = null, val message: String? = null)
-
-@Serializable
-private data class AnthropicResponse(
-    val content: List<AnthropicContentBlock> = emptyList(),
-    val error: AnthropicError? = null,
-)
+        "workout history from their Forge app. Give a practical review in plain text — a few " +
+        "short paragraphs, no markdown, no filler, no disclaimers.\n\n" +
+        "Cover, in this order:\n" +
+        "1. Consistency and schedule: how often they actually train versus the 5-a-week goal, " +
+        "which weeks or days they skip, the length of their gaps, and whether their rest-day " +
+        "cadence supports recovery or leaves too long between sessions. Suggest a concrete " +
+        "weekly schedule that fits the days they already show up on.\n" +
+        "2. Balance: which muscle groups are under-trained or ignored, and what to add.\n" +
+        "3. Progress: what's trending well and what's stalled, with 2-4 specific changes for the " +
+        "next few weeks (progression, volume, exercise selection, session pacing).\n\n" +
+        "Reference the actual numbers you're given rather than generic advice. The 'Training " +
+        "patterns' and 'Trend classification' sections are already-computed facts: state them in " +
+        "plain language and explain what to do about them; do not re-derive or second-guess them " +
+        "from the raw session list."
 
 sealed class AiReviewResult {
     data class Success(val text: String) : AiReviewResult()
@@ -53,62 +23,13 @@ sealed class AiReviewResult {
 }
 
 /**
- * Sends a workout summary to Anthropic's Messages API using the user's own key and returns the
- * written review. Deliberately dependency-free (plain HttpURLConnection, no OkHttp/Retrofit) —
- * this project has no networking library yet and this is one endpoint, so pulling in a whole HTTP
- * stack for it isn't worth the added Gradle dependency risk. If the app grows more network
- * features later (sync, import from other services), that's the point to introduce a real client.
+ * The workout review: sends [buildWorkoutSummary]'s brief and returns the written review. All the
+ * HTTP lives in [AnthropicClient]; this is just the prompt.
  */
 object AiReviewClient {
-    private val json = Json { ignoreUnknownKeys = true }
-
     suspend fun review(apiKey: String, model: String, workoutSummary: String): AiReviewResult =
-        withContext(Dispatchers.IO) {
-            if (apiKey.isBlank()) return@withContext AiReviewResult.Failure("No API key set — add one in Settings.")
-
-            val requestBody = json.encodeToString(
-                AnthropicRequest.serializer(),
-                AnthropicRequest(
-                    model = model,
-                    maxTokens = 1024,
-                    system = SYSTEM_PROMPT,
-                    messages = listOf(AnthropicMessage(role = "user", content = workoutSummary)),
-                ),
-            )
-
-            var conn: HttpURLConnection? = null
-            try {
-                conn = (URL(ANTHROPIC_ENDPOINT).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 20_000
-                    readTimeout = 45_000
-                    doOutput = true
-                    setRequestProperty("content-type", "application/json")
-                    setRequestProperty("x-api-key", apiKey)
-                    setRequestProperty("anthropic-version", ANTHROPIC_VERSION)
-                }
-                OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(requestBody) }
-
-                val status = conn.responseCode
-                val stream = if (status in 200..299) conn.inputStream else conn.errorStream
-                val raw = stream?.bufferedReader(Charsets.UTF_8)?.readText().orEmpty()
-
-                if (status !in 200..299) {
-                    val parsedErr = runCatching { json.decodeFromString(AnthropicResponse.serializer(), raw) }.getOrNull()
-                    val msg = parsedErr?.error?.message
-                        ?: if (status == 401) "That API key was rejected (HTTP 401)."
-                        else "Request failed (HTTP $status)."
-                    return@withContext AiReviewResult.Failure(msg)
-                }
-
-                val parsed = json.decodeFromString(AnthropicResponse.serializer(), raw)
-                val text = parsed.content.firstOrNull { it.type == "text" }?.text
-                if (text.isNullOrBlank()) AiReviewResult.Failure("The API returned an empty response.")
-                else AiReviewResult.Success(text.trim())
-            } catch (e: Exception) {
-                AiReviewResult.Failure(e.message?.let { "Network error: $it" } ?: "Network error.")
-            } finally {
-                conn?.disconnect()
-            }
+        when (val r = AnthropicClient.send(apiKey, model, SYSTEM_PROMPT, listOf(textBlock(workoutSummary)), maxTokens = 6000)) {
+            is AiResult.Success -> AiReviewResult.Success(r.text)
+            is AiResult.Failure -> AiReviewResult.Failure(r.message)
         }
 }
