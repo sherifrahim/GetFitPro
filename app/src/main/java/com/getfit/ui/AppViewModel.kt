@@ -256,6 +256,10 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                     ActionKind.DONE_SET -> sessionController.doneSet()
                     ActionKind.SKIP_REST -> sessionController.skip()
                     ActionKind.ADJUST_REST -> sessionController.addRest(action.restDeltaSec)
+                    // The watch app just came to the foreground and wants the current state — including
+                    // "no session" (active = false), so a stale Active screen clears too.
+                    ActionKind.REQUEST_STATE ->
+                        container.phoneWearSync.sendSnapshot(toWearSnapshot(sessionController.state.value, settings.value.units), force = true)
                 }
             },
             onHeartRate = { batch -> batch.samples.lastOrNull()?.let { _liveHeartRateBpm.value = it.bpm } },

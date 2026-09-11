@@ -23,9 +23,14 @@ class PhoneWearSync(context: Context) {
     // recomputes state every second but nothing meaningful actually changed.
     private var lastSentJson: String? = null
 
-    fun sendSnapshot(snapshot: SessionSnapshot) {
+    /**
+     * [force] bypasses the dedupe. Used when the watch explicitly asks for the current state (it just
+     * opened, or its listener service just started) — the bytes may be identical to the last send,
+     * but the watch never received that one.
+     */
+    fun sendSnapshot(snapshot: SessionSnapshot, force: Boolean = false) {
         val body = json.encodeToString(snapshot)
-        if (body == lastSentJson) return
+        if (!force && body == lastSentJson) return
         lastSentJson = body
         send(WearPaths.SESSION_SNAPSHOT, body)
     }

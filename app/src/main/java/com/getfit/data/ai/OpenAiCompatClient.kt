@@ -25,7 +25,7 @@ import java.net.URL
  */
 enum class CompatPreset(val label: String, val baseUrl: String, val defaultModel: String, val hint: String) {
     OPENAI("OpenAI", "https://api.openai.com/v1", "gpt-5.6-luna", "platform.openai.com — pay as you go, separate from ChatGPT Plus"),
-    GROQ("Groq", "https://api.groq.com/openai/v1", "qwen/qwen3.6-27b", "console.groq.com — free tier; this model takes up to 5 images"),
+    GROQ("Groq", "https://api.groq.com/openai/v1", "qwen/qwen3.6-27b", "console.groq.com — free tier (no card); body check fits ~2 photos per request"),
     DEEPSEEK("DeepSeek", "https://api.deepseek.com", "deepseek-flash", "platform.deepseek.com — very cheap; supports images"),
     OPENROUTER("OpenRouter", "https://openrouter.ai/api/v1", "", "openrouter.ai — one key, many models; pick a vision-capable one"),
     OLLAMA("Self-hosted", "https://your-server/v1", "", "Ollama or similar behind HTTPS (plain http:// is blocked on Android)"),
@@ -50,11 +50,17 @@ object OpenAiCompatClient {
      * compatible servers only know the old name, and every implementation ignores the one it
      * doesn't recognise.
      */
-    internal fun buildRequestBody(model: String, system: String, userContent: List<ContentBlock>, maxTokens: Int): String =
+    internal fun buildRequestBody(model: String, system: String, userContent: List<ContentBlock>, maxTokens: Int, baseUrl: String = ""): String =
         buildJsonObject {
             put("model", model)
             put("max_completion_tokens", maxTokens)
             put("max_tokens", maxTokens)
+            // Groq's Qwen models think inline (<think>…</think>) before answering. On the free tier
+            // that reasoning competes with the answer for an 8K tokens/minute budget — and with two
+            // images already costing 4,096 — so switch it off there. Verified: with it, a 20-token
+            // reply was 100% scratchpad; with "none", completion_tokens fell from ~130 to 2. The
+            // parameter is Groq-specific, hence gated on the host rather than sent everywhere.
+            if (baseUrl.contains("groq.com", ignoreCase = true)) put("reasoning_effort", "none")
             put("messages", buildJsonArray {
                 add(buildJsonObject { put("role", "system"); put("content", system) })
                 add(buildJsonObject {
@@ -87,8 +93,18 @@ object OpenAiCompatClient {
                 if (o["type"]?.jsonPrimitive?.content == "text") o["text"]?.jsonPrimitive?.content else null
             }.joinToString("\n")
             else -> null
-        }?.trim()
+        }?.let(::stripThinking)?.trim()
     }
+
+    /**
+     * Open reasoning models (Qwen 3, DeepSeek-R1 lineage, various OpenRouter routes) may emit their
+     * chain of thought inline as <think>…</think> before the answer. That is never something to
+     * show the user, so it is removed wherever it appears — including an unterminated block, which
+     * is what a max_tokens cut-off mid-thought looks like.
+     */
+    internal fun stripThinking(text: String): String =
+        text.replace(Regex("(?s)<think>.*?</think>"), "")
+            .replace(Regex("(?s)<think>.*$"), "")
 
     suspend fun send(
         baseUrl: String,
@@ -106,7 +122,7 @@ object OpenAiCompatClient {
             return@withContext AiResult.Failure("The endpoint must use https:// (plain http is blocked on Android).")
         }
 
-        val body = buildRequestBody(model, system, userContent, maxTokens)
+        val body = buildRequestBody(model, system, userContent, maxTokens, baseUrl)
         var conn: HttpURLConnection? = null
         try {
             conn = (URL(baseUrl.trimEnd('/') + "/chat/completions").openConnection() as HttpURLConnection).apply {

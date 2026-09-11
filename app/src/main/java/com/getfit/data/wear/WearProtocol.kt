@@ -48,7 +48,7 @@ data class SessionSnapshot(
     val totalSets: Int = 0,
 )
 
-enum class ActionKind { DONE_SET, SKIP_REST, ADJUST_REST }
+enum class ActionKind { DONE_SET, SKIP_REST, ADJUST_REST, REQUEST_STATE }
 
 /**
  * Action taken on the watch, sent phone-ward. The phone applies it exactly like a tap on its own

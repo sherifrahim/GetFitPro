@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +40,7 @@ import com.getfit.wear.data.HeartRateBatch
 import com.getfit.wear.data.HeartRateMonitor
 import com.getfit.wear.data.HeartRateSample
 import com.getfit.wear.data.SessionSnapshot
+import com.getfit.wear.data.SnapshotBus
 import com.getfit.wear.data.WatchAction
 import com.getfit.wear.data.WatchMessenger
 import com.getfit.wear.data.WearPhase
@@ -49,6 +49,24 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        /** Read by ForgeListenerService to decide whether a snapshot needs to launch us. */
+        @Volatile var inForeground: Boolean = false
+    }
+
+    override fun onResume() {
+        super.onResume()
+        inForeground = true
+        // Ask the phone for the current session, so opening the app mid-workout shows it immediately
+        // instead of waiting for the phone's next state change.
+        messenger.sendAction(WatchAction(ActionKind.REQUEST_STATE))
+    }
+
+    override fun onPause() {
+        inForeground = false
+        super.onPause()
+    }
+
     private val messenger by lazy { WatchMessenger(this) }
     private val heartRateMonitor by lazy { HeartRateMonitor(this) }
 
@@ -85,17 +103,17 @@ private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateM
     val pendingHrSamples = remember { mutableListOf<HeartRateSample>() }
     val context = LocalContext.current
 
-    DisposableEffect(Unit) {
-        val listener = messenger.listenForSnapshots { newSnapshot ->
-            // A new snapshot landing while the watch was showing Rest and now shows Work means rest
-            // just ended — the phone's own ticker drives this (see SessionController.kt), so the
-            // watch doesn't run a duplicate timer, it just reacts to what the phone already decided.
-            if (snapshot?.phase == WearPhase.REST && newSnapshot.phase == WearPhase.WORK) {
+    // Snapshots arrive via ForgeListenerService (app open or not) and land on SnapshotBus; this is
+    // the only consumer. A new snapshot landing while the watch was showing Rest and now shows Work
+    // means rest just ended — the phone's own ticker drives this (see SessionController.kt), so the
+    // watch doesn't run a duplicate timer, it just reacts to what the phone already decided.
+    LaunchedEffect(Unit) {
+        SnapshotBus.snapshot.collect { newSnapshot ->
+            if (newSnapshot != null && snapshot?.phase == WearPhase.REST && newSnapshot.phase == WearPhase.WORK) {
                 vibrateRestEnd(context)
             }
             snapshot = newSnapshot
         }
-        onDispose { messenger.stopListening(listener) }
     }
 
     // Heart rate only runs while a workout is actually in progress (not Idle, not the brief DONE

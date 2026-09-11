@@ -89,3 +89,35 @@ class OpenAiCompatRequestTest {
         }
     }
 }
+
+class OpenAiCompatReasoningTest {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    /** Groq's Qwen models think inline and the free tier's token budget is tight; only Groq gets the flag. */
+    @Test fun reasoning_is_disabled_on_groq_only() {
+        fun has(base: String) = json.parseToJsonElement(
+            OpenAiCompatClient.buildRequestBody("m", "s", listOf(textBlock("t")), 100, baseUrl = base),
+        ).jsonObject.containsKey("reasoning_effort")
+        assertThat(has("https://api.groq.com/openai/v1")).isTrue()
+        assertThat(has("https://api.openai.com/v1")).isFalse()
+        assertThat(has("https://api.deepseek.com")).isFalse()
+        assertThat(has("")).isFalse()
+    }
+
+    @Test fun think_blocks_are_stripped_from_answers() {
+        assertThat(OpenAiCompatClient.stripThinking("<think>\nplan: say ok\n</think>\n\nOK").trim()).isEqualTo("OK")
+        assertThat(OpenAiCompatClient.stripThinking("A <think>x</think> B <think>y</think> C")).isEqualTo("A  B  C")
+        assertThat(OpenAiCompatClient.stripThinking("no tags here")).isEqualTo("no tags here")
+    }
+
+    /** A max_tokens cut-off mid-thought leaves an unterminated block; that must vanish, not leak. */
+    @Test fun unterminated_think_block_is_removed() {
+        assertThat(OpenAiCompatClient.stripThinking("<think>still thinking about").trim()).isEmpty()
+        assertThat(OpenAiCompatClient.stripThinking("Answer.\n<think>trailing").trim()).isEqualTo("Answer.")
+    }
+
+    @Test fun extract_text_applies_stripping() {
+        val r = json.parseToJsonElement("""{"choices":[{"message":{"content":"<think>hmm</think>\nReal answer"}}]}""").jsonObject
+        assertThat(OpenAiCompatClient.extractText(r)).isEqualTo("Real answer")
+    }
+}
