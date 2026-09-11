@@ -43,6 +43,7 @@ data class NavState(
     val settingsOpen: Boolean = false,
     val goalOpen: Boolean = false,
     val aiReviewOpen: Boolean = false,
+    val coachOpen: Boolean = false,
     val bodyCheckOpen: Boolean = false,
     /** Build tab: the routine whose editor is open (null = the routines list). */
     val editRoutineId: String? = null,
@@ -72,6 +73,19 @@ data class AiReviewUiState(
     val loading: Boolean = false,
     val text: String? = null,
     val error: String? = null,
+)
+
+/** State for the AI coach overlay. [suggestions] are the targets the coach proposed, offered as chips. */
+data class CoachUiState(
+    val mode: com.getfit.data.ai.CoachMode = com.getfit.data.ai.CoachMode.NEXT,
+    /** For LAST_WORKOUT: which session; null = the most recent. */
+    val sessionId: String? = null,
+    val loading: Boolean = false,
+    val text: String? = null,
+    val error: String? = null,
+    val suggestions: List<com.getfit.data.ai.SuggestedTarget> = emptyList(),
+    /** Suggestion exercise ids already turned into targets this session, so the chip reads "Set". */
+    val accepted: Set<String> = emptySet(),
 )
 
 /** State for the Settings "Import & export" section. */

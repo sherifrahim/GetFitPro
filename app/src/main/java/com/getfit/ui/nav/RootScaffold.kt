@@ -33,6 +33,7 @@ import com.getfit.ui.TAB_HOME
 import com.getfit.ui.TAB_PROGRESS
 import com.getfit.ui.ai.AiReviewScreen
 import com.getfit.ui.ai.BodyCheckScreen
+import com.getfit.ui.ai.CoachScreen
 import com.getfit.ui.builder.BuilderScreen
 import com.getfit.ui.detail.DetailScreen
 import com.getfit.ui.exercises.ExercisesScreen
@@ -139,6 +140,12 @@ fun RootScaffold(vm: AppViewModel) {
             exit = slideOutVertically(tween(300)) { it },
         ) {
             AiReviewScreen(vm)
+        }
+
+        // AI coach overlay
+        BackHandler(enabled = nav.coachOpen) { vm.closeCoach() }
+        AnimatedVisibility(visible = nav.coachOpen, enter = slideInVertically(tween(350)) { it }, exit = slideOutVertically(tween(300)) { it }) {
+            CoachScreen(vm)
         }
 
         // Body check overlay

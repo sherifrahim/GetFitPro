@@ -156,20 +156,37 @@ fun ProgressScreen(vm: AppViewModel) {
             }
         }
 
-        // AI review entry point
+        // AI coach entry point (critique / what's next + PR attempts / goals)
         Row(
             Modifier.padding(top = 18.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.AccentGradient)
-                .clickable(remember { MutableInteractionSource() }, indication = null) { vm.openAiReview() }.padding(18.dp),
+                .clickable(remember { MutableInteractionSource() }, indication = null) { vm.openCoach(com.getfit.data.ai.CoachMode.NEXT) }.padding(18.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color(0x24000000)), contentAlignment = Alignment.Center) {
-                Icon(msIcon("smart_display"), null, tint = GfColor.OnAccent, modifier = Modifier.size(22.dp))
+                Icon(msIcon("psychology"), null, tint = GfColor.OnAccent, modifier = Modifier.size(22.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text("AI review", color = GfColor.OnAccent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
-                Text("Get a coach's read on your recent training", color = GfColor.OnAccentSub, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, modifier = Modifier.padding(top = 2.dp))
+                Text("AI coach", color = GfColor.OnAccent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
+                Text("Critique your last workout, plan the next one, set PR targets", color = GfColor.OnAccentSub, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, modifier = Modifier.padding(top = 2.dp))
             }
             Icon(msIcon("chevron_right"), null, tint = GfColor.OnAccentSub, modifier = Modifier.size(20.dp))
+        }
+
+        // AI review entry point (the longer pattern review)
+        Row(
+            Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(GfColor.Surface)
+                .border(1.dp, GfColor.Hairline06, RoundedCornerShape(20.dp))
+                .clickable(remember { MutableInteractionSource() }, indication = null) { vm.openAiReview() }.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(GfColor.AccentFill12), contentAlignment = Alignment.Center) {
+                Icon(msIcon("monitoring"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text("AI review", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
+                Text("Schedule, balance and progress across your whole log", color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.5.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+            Icon(msIcon("chevron_right"), null, tint = GfColor.TextFaint, modifier = Modifier.size(20.dp))
         }
 
         // Body check entry point — a surface card rather than a second accent gradient, so the two

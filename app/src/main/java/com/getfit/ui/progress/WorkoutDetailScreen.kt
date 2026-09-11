@@ -172,6 +172,7 @@ fun WorkoutDetailScreen(vm: AppViewModel, id: String) {
 
         if (menu) {
             GfSheet(title = session.name, onDismiss = { menu = false; confirmDelete = false }) {
+                GfSheetRow(msIcon("psychology"), "Ask the coach about this workout") { menu = false; vm.openCoach(com.getfit.data.ai.CoachMode.LAST_WORKOUT, id) }
                 GfSheetRow(msIcon("playlist_add_check"), "Save as routine") { vm.saveSessionAsRoutine(id); menu = false }
                 GfSheetRow(msIcon(if (confirmDelete) "warning" else "delete"), if (confirmDelete) "Tap again to delete this workout" else "Delete workout", destructive = true) {
                     if (confirmDelete) { vm.deleteSession(id); menu = false } else confirmDelete = true

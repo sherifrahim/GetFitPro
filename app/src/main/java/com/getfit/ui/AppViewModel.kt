@@ -7,6 +7,12 @@ import androidx.lifecycle.viewModelScope
 import com.getfit.data.ai.AI_REVIEW_MAX_TOKENS
 import com.getfit.data.ai.AiGateway
 import com.getfit.data.ai.AiResult
+import com.getfit.data.ai.COACH_MAX_TOKENS
+import com.getfit.data.ai.CoachMode
+import com.getfit.data.ai.SuggestedTarget
+import com.getfit.data.ai.buildCoachBrief
+import com.getfit.data.ai.coachSystemPrompt
+import com.getfit.data.ai.parseCoachAnswer
 import com.getfit.data.ai.BODY_CHECK_MAX_TOKENS
 import com.getfit.data.ai.PROVIDER_ANTHROPIC
 import com.getfit.data.ai.PROVIDER_COMPAT
@@ -30,6 +36,12 @@ import com.getfit.data.wear.ActionKind
 import com.getfit.data.wear.toWearSnapshot
 import com.getfit.di.AppContainer
 import com.getfit.domain.Best
+import com.getfit.domain.SessionSetRow
+import com.getfit.domain.exerciseDeltas
+import com.getfit.domain.fmtDur
+import com.getfit.domain.fmtVol
+import com.getfit.domain.recoveryByMuscle
+import com.getfit.domain.suggestRoutine
 import com.getfit.domain.HrPoint
 import com.getfit.domain.LoggedSet
 import com.getfit.domain.Units
@@ -438,6 +450,129 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                 is AiResult.Failure -> _aiReview.update { it.copy(loading = false, error = result.message) }
             }
         }
+    }
+
+    // ---- AI coach (critique the last workout / what to do next + PR attempts / goal review) ----
+    private val _coach = MutableStateFlow(CoachUiState())
+    val coach: StateFlow<CoachUiState> = _coach.asStateFlow()
+
+    /** Opening with a different mode or session clears the previous answer; same ask keeps it. */
+    fun openCoach(mode: CoachMode, sessionId: String? = null) {
+        _coach.update { c ->
+            if (c.mode == mode && c.sessionId == sessionId) c else CoachUiState(mode = mode, sessionId = sessionId)
+        }
+        _nav.update { it.copy(coachOpen = true, sessionDetailId = null) }
+    }
+    fun closeCoach() = _nav.update { it.copy(coachOpen = false) }
+    fun setCoachMode(mode: CoachMode) = openCoach(mode, null)
+
+    /** "Session under review": the workout, its sets, and each lift's top set vs the previous time. */
+    private fun sessionSection(sessionId: String?): String? {
+        val d = data.value
+        val s = (sessionId?.let { id -> d.sessions.firstOrNull { it.id == id } } ?: d.sessions.maxByOrNull { it.dateMs }) ?: return null
+        val units = settings.value.units
+        val sets = d.sessionSets.filter { it.sessionId == s.id }
+        val rows = sets.map { SessionSetRow(it.exerciseId, it.name, it.weight, it.reps) }
+        val bwOf: (String) -> Boolean = { exId -> d.exercise(exId)?.let { isBW(it.equipment, it.reps) } ?: rows.filter { it.exerciseId == exId }.all { it.weightKg == 0.0 } }
+        val deltas = exerciseDeltas(s.dateMs, rows, d.logs.map { LoggedSet(it.exerciseId, it.weight, it.reps, it.dateMs) }, bwOf)
+        val routine = d.routine(s.routineId)
+        val df = java.text.SimpleDateFormat("EEE d MMM, h:mm a", java.util.Locale.US)
+        val sb = StringBuilder()
+        sb.appendLine("Session under review: \"${s.name}\" on ${df.format(java.util.Date(s.dateMs))}.")
+        sb.appendLine(
+            "Duration ${if (s.durationSec > 0) fmtDur(s.durationSec) else "unknown"}, ${s.totalSets} sets, " +
+                "${fmtVol(Units.volDisplay(s.volume, units))} $units volume, ${s.prs} PRs" +
+                (if (s.avgBpm > 0) ", avg heart rate ${s.avgBpm} bpm (max ${s.maxBpm})" else "") +
+                (if (s.calories > 0) ", ~${s.calories} kcal" else "") + ".",
+        )
+        if (routine != null) {
+            sb.appendLine("Routine plan was: " + routine.items.joinToString("; ") { p -> "${d.exercise(p.id)?.name ?: p.id} ${p.sets}x${p.reps}" } + ".")
+        }
+        sb.appendLine("Sets as logged, with the top set vs the previous session of that lift:")
+        sets.groupBy { it.exerciseId }.forEach { (exId, rows2) ->
+            val bw = bwOf(exId)
+            val list = rows2.joinToString(", ") { r -> if (bw) "${r.reps} reps" else "${Units.fmtDisplay(Units.toDisplay(r.weight, units), units)}x${r.reps}" }
+            val dlt = deltas[exId]
+            val vs = when {
+                dlt?.delta == null -> "first time logged"
+                bw -> "vs last: ${if (dlt.delta!! >= 0) "+" else ""}${dlt.delta!!.toInt()} reps"
+                else -> "vs last: ${if (dlt.delta!! >= 0) "+" else ""}${Units.fmtDisplay(Units.toDisplay(dlt.delta!!, units), units)} $units on the top set"
+            }
+            sb.appendLine("- ${rows2.first().name}: $list ($vs)")
+        }
+        return sb.toString()
+    }
+
+    /** "Recovery": per-muscle readiness, the rotation's next routine, and every routine's contents. */
+    private fun recoverySection(): String {
+        val d = data.value
+        val now = System.currentTimeMillis()
+        val recovery = recoveryByMuscle(
+            d.sessions.associate { it.id to it.dateMs }, d.sessionSets.map { it.sessionId to it.exerciseId },
+            { id -> d.exercise(id)?.muscle }, now,
+        )
+        val pick = suggestRoutine(d.routines.map { r -> r.id to r.items.map { it.id } }, recovery, { id -> d.exercise(id)?.muscle }, now)
+        val sb = StringBuilder()
+        sb.appendLine("Recovery (pre-computed readiness per muscle group, 0 = just trained, 100 = fully recovered):")
+        recovery.sortedByDescending { it.readiness }.forEach { r ->
+            val since = r.daysSince(now)?.let { "last trained ${if (it == 0) "today" else "$it day${if (it == 1) "" else "s"} ago"}" } ?: "never trained"
+            sb.appendLine("- ${r.muscle}: ${(r.readiness * 100).toInt()}% ($since, ${r.setsLast7d} sets in the last 7 days)")
+        }
+        sb.appendLine()
+        sb.appendLine("Routines (id: name — exercises):")
+        d.routines.forEach { r ->
+            sb.appendLine("- ${r.id}: ${r.name} — " + r.items.joinToString(", ") { p -> "${d.exercise(p.id)?.name ?: p.id} ${p.sets}x${p.reps}" })
+        }
+        d.currentRoutine?.let { sb.appendLine("The rotation says next is: ${it.name}.") }
+        pick?.let { p -> sb.appendLine("Recovery heuristic prefers: ${d.routine(p.routineId)?.name ?: p.routineId} (${p.reason}).") }
+        return sb.toString()
+    }
+
+    private fun targetableSection(): String {
+        val d = data.value
+        // Anything with a logged best, plus the curated goal set, so the coach can only name real ids.
+        val ids = (d.bestMap.keys + Curated.GOAL_EX).distinct()
+        return ids.mapNotNull { id -> d.exercise(id)?.let { "- $id: ${it.name}${if (isBW(it.equipment, it.reps)) " (bodyweight, target in reps)" else ""}" } }.joinToString("\n")
+    }
+
+    fun runCoach() {
+        val c = _coach.value
+        if (c.loading) return
+        _coach.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            aiGateway.missingConfig(settings.value)?.let { msg ->
+                _coach.update { it.copy(loading = false, error = msg) }
+                return@launch
+            }
+            val units = settings.value.units
+            val summary = currentWorkoutSummary()
+            val brief = buildCoachBrief(
+                c.mode, summary,
+                sessionSection = if (c.mode == CoachMode.LAST_WORKOUT) sessionSection(c.sessionId) ?: "No workouts logged yet." else null,
+                recoverySection = if (c.mode == CoachMode.NEXT) recoverySection() else null,
+                targetable = targetableSection(),
+            )
+            when (val result = aiGateway.send(settings.value, coachSystemPrompt(c.mode, units), listOf(textBlock(brief)), COACH_MAX_TOKENS)) {
+                is AiResult.Success -> {
+                    val allowed = data.value.exercises.map { it.id }.toSet()
+                    val (prose, targets) = parseCoachAnswer(result.text, allowed)
+                    _coach.update { it.copy(loading = false, text = prose, suggestions = targets, error = null) }
+                }
+                is AiResult.Failure -> _coach.update { it.copy(loading = false, error = result.message) }
+            }
+        }
+    }
+
+    /** Turns a coach suggestion into a real target (the same record the goal sheet writes). */
+    fun acceptSuggestedTarget(s: SuggestedTarget) = viewModelScope.launch {
+        val bw = isBwEx(s.exerciseId)
+        val cur = goalCur(s.exerciseId)
+        val targetNatural = if (bw) s.value else Units.fromDisplay(s.value, settings.value.units)
+        if (targetNatural <= cur) { toast("That's not above your current best", "info"); return@launch }
+        val now = System.currentTimeMillis()
+        progressRepo.addTarget(TargetEntity("t$now", s.exerciseId, targetNatural, cur, now, s.weeks))
+        _coach.update { it.copy(accepted = it.accepted + s.exerciseId) }
+        toast("Target set", "flag")
     }
 
     // ---- body check (photos -> physique assessment + training changes) ----
