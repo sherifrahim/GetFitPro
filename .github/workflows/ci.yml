@@ -2,48 +2,80 @@ name: CI
 
 on:
   push:
-    branches: [main, "feat/**"]
+    branches: [main, "feat/**", "claude/**"]
   pull_request:
     branches: [main]
+  # Lets you build APKs on demand from the Actions tab without pushing a commit.
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Build, test, lint (app + wear)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      # Java 21, matching gradle/gradle-daemon-jvm.properties. That file is load-bearing: Gradle 8.13's
+      # Kotlin DSL compiler cannot run on newer JDKs, so the daemon must land on a 21. setup-java's
+      # JAVA_HOME satisfies the criteria directly; the foojay resolver in settings.gradle.kts is the
+      # fallback if it ever doesn't.
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
-      - name: Setup Gradle
+      - name: Set up Gradle (with build cache)
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      # The executable bit has been lost from gradlew before (see 8fab90b); cheap to re-assert.
       - name: Make gradlew executable
         run: chmod +x gradlew
 
+      # local.properties is gitignored, so there is no sdk.dir here; AGP falls back to ANDROID_HOME,
+      # which ubuntu-latest pre-sets. Missing platforms/build-tools are downloaded by AGP on demand.
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest --console=plain
+        run: ./gradlew :app:testDebugUnitTest --console=plain
 
       - name: Lint
-        run: ./gradlew lintDebug --console=plain
+        run: ./gradlew :app:lintDebug --console=plain
 
-      - name: Assemble debug APK
-        run: ./gradlew assembleDebug --console=plain
+      # Both modules, always. :app compiling proves nothing about :wear — the watch app once shipped
+      # green for days while crashing on launch (a runtime-only Guava issue), so the least CI can do
+      # is make sure both actually assemble.
+      - name: Assemble debug APKs (app + wear)
+        run: ./gradlew :app:assembleDebug :wear:assembleDebug --console=plain
 
-      - name: Upload debug APK
+      - name: Upload phone APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: forge-app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
 
-      - name: Upload test/lint reports
+      - name: Upload watch APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-wear-debug
+          path: wear/build/outputs/apk/debug/wear-debug.apk
+          if-no-files-found: error
+
+      - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -51,3 +83,5 @@ jobs:
           path: |
             app/build/reports/tests
             app/build/reports/lint-results-debug.html
+            app/build/test-results
+          if-no-files-found: ignore

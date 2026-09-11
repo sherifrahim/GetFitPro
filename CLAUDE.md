@@ -177,8 +177,13 @@ Two modules: `:app` (phone, min SDK 26) and `:wear` (Wear OS, min SDK 30). Alway
 
 Environment notes (already solved — don't rediscover):
 
-- **`JAVA_HOME`** is pinned via `org.gradle.java.home` in `gradle.properties` (Android Studio's
-  bundled JBR). No need to set it manually.
+- **JDKs — two different things, easy to conflate.** (1) The *wrapper script* needs `JAVA_HOME` or
+  `java` on `PATH` just to launch; that's a system setting, set system-wide on the dev machine.
+  (2) The *daemon* runs on the JDK chosen by `gradle/gradle-daemon-jvm.properties` (Java 21, found
+  in `~/.jdks/jbr-21.0.11` locally; Temurin 21 on CI). **That file is load-bearing** — Gradle 8.13's
+  Kotlin DSL compiler can't run on newer JDKs, and Studio's bundled JBR is Java 25. **Never set
+  `org.gradle.java.home`** in any `gradle.properties`: pointing it at the JBR would break every
+  `.kts` compile if honoured, and a Windows path there breaks Linux CI.
 - **`local.properties`** is gitignored, so a fresh **git worktree** has no SDK path and every build
   fails with "SDK location not found". Copy it in from the main checkout.
 - **Don't move the repo back under OneDrive** — it locked files mid-build and caused repeated
