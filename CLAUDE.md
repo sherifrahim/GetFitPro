@@ -115,9 +115,16 @@ rate via Health Services `ExerciseClient`, batched every 8s.
   from the CSV import/export below, which moves sets between apps and is lossy.
 - **Import/export** (`data/importexport/`) — Hevy/Strong/FitNotes/Forge CSV. Matches column **names**,
   not positions, because real sample exports couldn't be verified up front.
-- **Cloud sync** (`data/sync/`) — client-side groundwork only (DataStore outbox, repo, HTTP stub).
-  Deliberately inert until a real server URL is supplied via Settings. **Don't build server-side
-  anything without one.**
+- **Cloud sync** (`data/sync/` + `server/forge-sync/`) — **live.** Snapshot model: the app uploads its
+  backup document ~20 s after any change (`SyncRepo.noteChange()` is called from every write path)
+  and can pull the newest one back (confirm-gated, replaces local data). One user, whole snapshots,
+  last-writer-wins — deliberately NOT op-based merge. The server is a ~150-line FastAPI app at
+  **https://getfit.mooo.com** on the user's Oracle VM (`129.151.128.111`, Ubuntu, 1 GB RAM, shared
+  with an unrelated `threatfeed` service and Postgres 14 — **never touch threatfeed's nginx block or
+  service**). It reuses the existing Postgres (db `forge`), runs under systemd `forge-sync` with
+  `MemoryMax=160M`, and is deployed by the idempotent `server/forge-sync/deploy.sh`. Bearer token
+  lives in `/home/ubuntu/forge-sync/.env` on the server and in `SecureKeyStore` (slot `SYNC`) on
+  the phone. Restore pulls the **latest** version only; the server keeps the last 20.
 - **Trend insight** (`domain/Trend.kt`) — pure Kotlin, no network; surfaced on Detail and fed to the
   AI review prompt as a pre-computed fact so the model explains it rather than re-deriving it.
 
