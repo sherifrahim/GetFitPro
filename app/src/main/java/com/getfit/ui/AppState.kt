@@ -4,7 +4,10 @@ import com.getfit.data.db.ExerciseEntity
 import com.getfit.data.db.SessionEntity
 import com.getfit.data.db.SetLogEntity
 import com.getfit.data.db.TargetEntity
+import com.getfit.data.db.MeasurementEntity
 import com.getfit.data.prefs.PlanItemData
+import com.getfit.data.prefs.Routine
+import com.getfit.data.prefs.RoutinesData
 import com.getfit.domain.Best
 
 /** Combined, hydrated data snapshot (the prototype's derived state, computed once). */
@@ -13,11 +16,19 @@ data class AppData(
     val logs: List<SetLogEntity> = emptyList(),
     val sessions: List<SessionEntity> = emptyList(),
     val targets: List<TargetEntity> = emptyList(),
-    val plan: List<PlanItemData> = emptyList(),
+    val routinesData: RoutinesData = RoutinesData(),
+    val measurements: List<MeasurementEntity> = emptyList(),
     val bestMap: Map<String, Best> = emptyMap(),
     val loaded: Boolean = false,
 ) {
     fun exercise(id: String): ExerciseEntity? = exercises.firstOrNull { it.id == id }
+    fun routine(id: String?): Routine? = routinesData.routines.firstOrNull { it.id == id }
+
+    val routines: List<Routine> get() = routinesData.routines
+    /** The routine that is up next — the one Home offers and the watch starts by default. */
+    val currentRoutine: Routine? get() = routinesData.current
+    /** Its items: the single plan the prototype had. Kept so the session and stats code reads the same. */
+    val plan: List<PlanItemData> get() = currentRoutine?.items.orEmpty()
 }
 
 /** Transient navigation + overlay state (tab, search, overlays, toast). */
@@ -30,6 +41,14 @@ data class NavState(
     val goalOpen: Boolean = false,
     val aiReviewOpen: Boolean = false,
     val bodyCheckOpen: Boolean = false,
+    /** Build tab: the routine whose editor is open (null = the routines list). */
+    val editRoutineId: String? = null,
+    /** Build tab: the routine whose "⋯" sheet is open. */
+    val routineMenuId: String? = null,
+    /** Progress tab: the session whose detail overlay is open. */
+    val sessionDetailId: String? = null,
+    val profileOpen: Boolean = false,
+    val measurementsOpen: Boolean = false,
     val booted: Boolean = false,
     val charted: Boolean = false,
     val confirmClear: Boolean = false,

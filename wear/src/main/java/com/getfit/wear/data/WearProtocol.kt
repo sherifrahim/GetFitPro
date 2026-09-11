@@ -44,18 +44,31 @@ data class SessionSnapshot(
     val pausedAccumMs: Long = 0,
     val completedSets: Int = 0,
     val totalSets: Int = 0,
+    // Routines, for the watch's Idle screen. [currentRoutineId] is the one up next; the list is in
+    // rotation order. Present on every snapshot (active or not) so a watch that missed the last
+    // routine edit still catches up on the next state change. Defaults keep old snapshots decodable.
+    val routines: List<WearRoutine> = emptyList(),
+    val currentRoutineId: String = "",
+    // Name of the running session, shown on the Active/Rest screens. "" on older phones.
+    val sessionName: String = "",
 )
 
-enum class ActionKind { DONE_SET, SKIP_REST, ADJUST_REST, REQUEST_STATE }
+/** A routine as the watch needs it: enough to list and pick, never the exercises themselves. */
+@Serializable
+data class WearRoutine(val id: String, val name: String, val exercises: Int, val sets: Int)
+
+enum class ActionKind { DONE_SET, SKIP_REST, ADJUST_REST, REQUEST_STATE, SELECT_ROUTINE, START_ROUTINE }
 
 /**
  * Action taken on the watch, sent phone-ward. The phone applies it exactly like a tap on its own
  * session screen (SessionController.doneSet() / .skip() / .addRest()) — one source of truth, no
  * separate watch-side session logic to keep in sync. [restDeltaSec] is only meaningful for
- * ADJUST_REST (the watch's Rest screen has a single "+15" action in v1).
+ * ADJUST_REST (the watch's Rest screen has a single "+15" action in v1). [routineId] is only
+ * meaningful for SELECT_ROUTINE (make it the one up next) and START_ROUTINE (begin a session for it;
+ * blank = whichever is current).
  */
 @Serializable
-data class WatchAction(val kind: ActionKind, val restDeltaSec: Int = 0)
+data class WatchAction(val kind: ActionKind, val restDeltaSec: Int = 0, val routineId: String = "")
 
 @Serializable
 data class HeartRateSample(val bpm: Double, val atMs: Long)

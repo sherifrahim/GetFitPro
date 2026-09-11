@@ -3,8 +3,14 @@ package com.getfit.ui
 import com.getfit.core.util.SessionFeedback
 import com.getfit.data.db.Curated
 import com.getfit.data.prefs.PlanItemData
+import com.getfit.data.prefs.Routine
 import com.getfit.di.AppContainer
+import com.getfit.domain.HrPoint
 import com.getfit.domain.LoggedSet
+import com.getfit.domain.addHeartRate
+import com.getfit.domain.avgBpm
+import com.getfit.domain.estimateCalories
+import com.getfit.domain.maxBpm
 import com.getfit.domain.Phase
 import com.getfit.domain.SessionItem
 import com.getfit.domain.SessionState
@@ -80,7 +86,12 @@ class SessionController(
         if (s == null) container.sessionStore.clear() else container.sessionStore.save(s)
     }
 
-    fun start(items: List<PlanItemData>) {
+    /** Start a session for a whole routine. The saved record is named after it and, on finish,
+     *  the rotation moves to the routine after it. */
+    fun start(routine: Routine) = start(routine.items, routine.name, routine.id)
+
+    /** An ad-hoc session (e.g. one exercise from its detail screen): no routine, no rotation. */
+    fun start(items: List<PlanItemData>, name: String = "Workout", routineId: String = "") {
         scope.launch {
             val settings = container.settingsStore.flow.first()
             val u = settings.units
@@ -103,9 +114,17 @@ class SessionController(
                 si.id to ((b?.let { Units.toDisplay(it.weight, u) } ?: 0.0) to (b?.reps ?: 0))
             }
             _state.value = startSession(sessItems, settings.restDefault, preBest, System.currentTimeMillis())
+                .copy(name = name, routineId = routineId)
             startTicker()
             persist()
         }
+    }
+
+    /** Watch heart-rate batch. Kept on the state (downsampled) so it survives process death and
+     *  lands in the saved session for the workout detail's HR graph. */
+    fun recordHeartRate(samples: List<HrPoint>) {
+        _state.update { it?.let { s -> addHeartRate(s, samples) } }
+        persist()
     }
 
     private fun startTicker() {
@@ -180,14 +199,22 @@ class SessionController(
             // Convert logged display-unit weights back to canonical kg for storage.
             val setsKg = s.log.map { SessionSaveSet(it.id, it.name, Units.fromDisplay(it.weight, u), it.reps) }
             val volumeKg = setsKg.sumOf { if (bwById[it.exerciseId] == true) 0.0 else it.weight * it.reps }
+            val avg = avgBpm(s.hr)
+            val profile = container.settingsStore.flow.first()
             container.workoutRepo.saveSession(
                 now = System.currentTimeMillis(),
-                name = "Push Day",
+                name = s.name,
                 durationSec = s.elapsed,
                 sets = setsKg,
                 volume = Math.round(volumeKg).toInt(),
                 prs = s.newPRs.size,
+                routineId = s.routineId,
+                avgBpm = avg,
+                maxBpm = maxBpm(s.hr),
+                calories = estimateCalories(s.elapsed, avg, profile.bodyWeightKg, profile.ageYears(), profile.isMale()),
+                heartRate = s.hr,
             )
+            container.workoutRepo.advanceAfter(s.routineId)
             toast("Workout saved", "check_circle")
         }
         _state.value = null

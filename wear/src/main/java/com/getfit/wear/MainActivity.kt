@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -29,9 +30,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.Chip
+import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.CircularProgressIndicator
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
@@ -72,15 +77,15 @@ class MainActivity : ComponentActivity() {
 
     // Must be registered unconditionally before the activity leaves CREATED — doing it here as a
     // property initializer (not inside onCreate's body) is the safe place for that.
-    private val requestBodySensors = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private val requestSensors = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestBodySensors.launch(Manifest.permission.BODY_SENSORS)
-        }
+        // Both are needed for heart rate on current Wear OS (see the manifest comment); asking for
+        // the pair in one prompt avoids a second dialog on the next launch.
+        val wanted = listOf(Manifest.permission.BODY_SENSORS, "android.permission.health.READ_HEART_RATE")
+            .filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+        if (wanted.isNotEmpty()) requestSensors.launch(wanted.toTypedArray())
         setContent {
             MaterialTheme(colors = ForgeWearColors) {
                 ForgeWearApp(messenger, heartRateMonitor)
@@ -159,7 +164,11 @@ private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateM
 
     val s = snapshot
     when {
-        s == null || !s.active -> IdleScreen()
+        s == null || !s.active -> IdleScreen(
+            snapshot = s,
+            onStart = { messenger.sendAction(WatchAction(ActionKind.START_ROUTINE, routineId = it)) },
+            onSelect = { messenger.sendAction(WatchAction(ActionKind.SELECT_ROUTINE, routineId = it)) },
+        )
         s.phase == WearPhase.DONE -> SessionEndScreen(s)
         s.phase == WearPhase.REST -> RestScreen(
             snapshot = s,
@@ -176,18 +185,64 @@ private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateM
     }
 }
 
+/**
+ * No session running. With routines on hand this is the watch's own start screen: the one up next
+ * on top as a Start chip, the others below — tapping one of those makes IT the next workout (the
+ * phone's Home card follows), then Start begins it. Without routines (phone app never opened since
+ * the update) it falls back to pointing at the phone.
+ */
 @Composable
-private fun IdleScreen() {
-    Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Forge", color = ForgeWearColors.primary, style = MaterialTheme.typography.title2)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Open Forge on your phone to start a workout",
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.caption2,
-                color = ForgeWearColors.onBackground,
+private fun IdleScreen(snapshot: SessionSnapshot?, onStart: (String) -> Unit, onSelect: (String) -> Unit) {
+    val routines = snapshot?.routines.orEmpty()
+    val current = routines.firstOrNull { it.id == snapshot?.currentRoutineId } ?: routines.firstOrNull()
+    if (current == null) {
+        Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Forge", color = ForgeWearColors.primary, style = MaterialTheme.typography.title2)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Open Forge on your phone to start a workout",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.caption2,
+                    color = ForgeWearColors.onBackground,
+                )
+            }
+        }
+        return
+    }
+    val listState = rememberScalingLazyListState()
+    ScalingLazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        state = listState,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        item {
+            Text("Up next", style = MaterialTheme.typography.caption2, color = ForgeWearColors.onSurfaceVariant)
+        }
+        item {
+            Chip(
+                onClick = { onStart(current.id) },
+                label = { Text(current.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                secondaryLabel = { Text("Start · ${current.exercises} exercises") },
+                colors = ChipDefaults.primaryChipColors(),
+                modifier = Modifier.fillMaxWidth(),
             )
+        }
+        val others = routines.filter { it.id != current.id }
+        if (others.isNotEmpty()) {
+            item {
+                Text("Tap to do next", style = MaterialTheme.typography.caption2, color = ForgeWearColors.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+            }
+            items(others.size) { i ->
+                val r = others[i]
+                Chip(
+                    onClick = { onSelect(r.id) },
+                    label = { Text(r.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    secondaryLabel = { Text("${r.exercises} exercises · ${r.sets} sets") },
+                    colors = ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }

@@ -222,7 +222,7 @@ private fun DoneView(s: SessionState, units: String, onFinish: () -> Unit) {
             Icon(msIcon("check"), null, tint = GfColor.Accent, modifier = Modifier.size(54.dp))
         }
         Text("Workout complete", color = GfColor.OnAccent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 28.sp, modifier = Modifier.padding(top = 22.dp))
-        Text("Push Day · logged & saved", color = GfColor.OnAccentSub, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
+        Text("${s.name} · logged & saved", color = GfColor.OnAccentSub, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
 
         Row(Modifier.padding(top = 26.dp), horizontalArrangement = Arrangement.spacedBy(26.dp)) {
             DoneStat(fmtClock(s.elapsed), "time")

@@ -164,7 +164,7 @@ object ForgeIcons {
         ).path(
             fill = SolidColor(Color.Black),
             fillAlpha = 1f, strokeAlpha = 1f,
-            pathFillType = PathFillType.NonZero,
+            pathFillType = PathFillType.EvenOdd,
         ) {
             moveTo(8.22f, 3.0f)
             lineTo(15.78f, 3.0f)
@@ -217,7 +217,7 @@ object ForgeIcons {
         ).path(
             fill = SolidColor(Color.Black),
             fillAlpha = 1f, strokeAlpha = 1f,
-            pathFillType = PathFillType.NonZero,
+            pathFillType = PathFillType.EvenOdd,
         ) {
             moveTo(8.22f, 3.0f)
             lineTo(15.78f, 3.0f)
@@ -1161,6 +1161,135 @@ object ForgeIcons {
             curveTo(5.8f, 9.0f, 8.5f, 5.0f, 12.0f, 2.0f)
             close()
         }.build()
+    }
+
+    // --- added with routines / profile / history ---
+
+    private fun icon(name: String, body: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit): ImageVector =
+        ImageVector.Builder(
+            name = "Forge.$name",
+            defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).path(fill = SolidColor(Color.Black), fillAlpha = 1f, strokeAlpha = 1f, pathFillType = PathFillType.NonZero, pathBuilder = body).build()
+
+    /** Three dots — the "⋯" menu affordance. */
+    val MoreHoriz: ImageVector by lazy {
+        icon("MoreHoriz") {
+            for (cx in listOf(5.5f, 12f, 18.5f)) {
+                moveTo(cx - 2f, 12f)
+                arcTo(2f, 2f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = cx + 2f, y1 = 12f)
+                arcTo(2f, 2f, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = cx - 2f, y1 = 12f)
+                close()
+            }
+        }
+    }
+
+    /** Pencil. */
+    val Edit: ImageVector by lazy {
+        icon("Edit") {
+            moveTo(3f, 17.25f); lineTo(3f, 21f); lineTo(6.75f, 21f); lineTo(17.81f, 9.94f); lineTo(14.06f, 6.19f); close()
+            moveTo(20.71f, 7.04f)
+            curveTo(21.1f, 6.65f, 21.1f, 6.02f, 20.71f, 5.63f)
+            lineTo(18.37f, 3.29f)
+            curveTo(17.98f, 2.9f, 17.35f, 2.9f, 16.96f, 3.29f)
+            lineTo(15.13f, 5.12f); lineTo(18.88f, 8.87f); close()
+        }
+    }
+
+    /** Two overlapping sheets — duplicate. */
+    val ContentCopy: ImageVector by lazy {
+        icon("ContentCopy") {
+            moveTo(16f, 1f); lineTo(4f, 1f); lineTo(4f, 15f); lineTo(6f, 15f); lineTo(6f, 3f); lineTo(16f, 3f); close()
+            moveTo(19f, 5f); lineTo(8f, 5f); lineTo(8f, 23f); lineTo(19f, 23f); close()
+            moveTo(17f, 21f); lineTo(10f, 21f); lineTo(10f, 7f); lineTo(17f, 7f); close()
+        }
+    }
+
+    /** Arrow into a bar — "do this next". */
+    val EventUpcoming: ImageVector by lazy {
+        icon("EventUpcoming") {
+            moveTo(4f, 11f); lineTo(13.17f, 11f); lineTo(9.59f, 7.41f); lineTo(11f, 6f); lineTo(17f, 12f); lineTo(11f, 18f); lineTo(9.59f, 16.59f); lineTo(13.17f, 13f); lineTo(4f, 13f); close()
+            moveTo(19f, 5f); lineTo(21f, 5f); lineTo(21f, 19f); lineTo(19f, 19f); close()
+        }
+    }
+
+    /** Heart — heart rate. */
+    val Favorite: ImageVector by lazy {
+        icon("Favorite") {
+            moveTo(12f, 21.35f)
+            lineTo(10.55f, 20.03f)
+            curveTo(5.4f, 15.36f, 2f, 12.28f, 2f, 8.5f)
+            curveTo(2f, 5.42f, 4.42f, 3f, 7.5f, 3f)
+            curveTo(9.24f, 3f, 10.91f, 3.81f, 12f, 5.09f)
+            curveTo(13.09f, 3.81f, 14.76f, 3f, 16.5f, 3f)
+            curveTo(19.58f, 3f, 22f, 5.42f, 22f, 8.5f)
+            curveTo(22f, 12.28f, 18.6f, 15.36f, 13.45f, 20.04f)
+            close()
+        }
+    }
+
+    /** Person silhouette — profile. */
+    val Person: ImageVector by lazy {
+        icon("Person") {
+            moveTo(12f, 12f)
+            curveTo(14.21f, 12f, 16f, 10.21f, 16f, 8f)
+            curveTo(16f, 5.79f, 14.21f, 4f, 12f, 4f)
+            curveTo(9.79f, 4f, 8f, 5.79f, 8f, 8f)
+            curveTo(8f, 10.21f, 9.79f, 12f, 12f, 12f)
+            close()
+            moveTo(12f, 14f)
+            curveTo(9.33f, 14f, 4f, 15.34f, 4f, 18f)
+            lineTo(4f, 20f); lineTo(20f, 20f); lineTo(20f, 18f)
+            curveTo(20f, 15.34f, 14.67f, 14f, 12f, 14f)
+            close()
+        }
+    }
+
+    /** Calendar grid. */
+    val CalendarMonth: ImageVector by lazy {
+        icon("CalendarMonth") {
+            moveTo(19f, 4f); lineTo(18f, 4f); lineTo(18f, 2f); lineTo(16f, 2f); lineTo(16f, 4f); lineTo(8f, 4f); lineTo(8f, 2f); lineTo(6f, 2f); lineTo(6f, 4f); lineTo(5f, 4f)
+            curveTo(3.9f, 4f, 3f, 4.9f, 3f, 6f)
+            lineTo(3f, 20f)
+            curveTo(3f, 21.1f, 3.9f, 22f, 5f, 22f)
+            lineTo(19f, 22f)
+            curveTo(20.1f, 22f, 21f, 21.1f, 21f, 20f)
+            lineTo(21f, 6f)
+            curveTo(21f, 4.9f, 20.1f, 4f, 19f, 4f)
+            close()
+            moveTo(19f, 20f); lineTo(5f, 20f); lineTo(5f, 9f); lineTo(19f, 9f); close()
+        }
+    }
+
+    /** Clipboard with a tick — "saved as routine". */
+    val PlaylistAddCheck: ImageVector by lazy {
+        icon("PlaylistAddCheck") {
+            moveTo(3f, 10f); lineTo(14f, 10f); lineTo(14f, 12f); lineTo(3f, 12f); close()
+            moveTo(3f, 6f); lineTo(14f, 6f); lineTo(14f, 8f); lineTo(3f, 8f); close()
+            moveTo(3f, 14f); lineTo(10f, 14f); lineTo(10f, 16f); lineTo(3f, 16f); close()
+            moveTo(20.59f, 11.93f); lineTo(22f, 13.34f); lineTo(15.01f, 20.34f); lineTo(10.77f, 16.1f); lineTo(12.18f, 14.69f); lineTo(15.01f, 17.52f); close()
+        }
+    }
+
+    /** Psychology — the AI coach. */
+    val Psychology: ImageVector by lazy {
+        icon("Psychology") {
+            moveTo(13f, 2f)
+            curveTo(9.13f, 2f, 6f, 5.13f, 6f, 9f)
+            lineTo(6f, 11.2f); lineTo(4.2f, 14f); lineTo(6f, 14f); lineTo(6f, 17f)
+            curveTo(6f, 18.1f, 6.9f, 19f, 8f, 19f)
+            lineTo(10f, 19f); lineTo(10f, 22f); lineTo(17f, 22f); lineTo(17f, 17.3f)
+            curveTo(18.86f, 16.07f, 20f, 13.99f, 20f, 11.7f)
+            lineTo(20f, 9f)
+            curveTo(20f, 5.13f, 16.87f, 2f, 13f, 2f)
+            close()
+            moveTo(13f, 6f)
+            curveTo(14.66f, 6f, 16f, 7.34f, 16f, 9f)
+            curveTo(16f, 10.66f, 14.66f, 12f, 13f, 12f)
+            curveTo(11.34f, 12f, 10f, 10.66f, 10f, 9f)
+            curveTo(10f, 7.34f, 11.34f, 6f, 13f, 6f)
+            close()
+        }
     }
 
 }

@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.getfit.core.theme.GfColor
@@ -48,7 +49,10 @@ import com.getfit.domain.fmtVol
 import com.getfit.domain.streakCount
 import com.getfit.domain.weekAgg
 import com.getfit.domain.weekStartLocal
+import com.getfit.ui.AppData
 import com.getfit.ui.AppViewModel
+import com.getfit.ui.builder.estMinutes
+import com.getfit.data.prefs.Routine
 import java.util.Calendar
 
 @Composable
@@ -71,10 +75,14 @@ fun HomeScreen(vm: AppViewModel) {
     )
     val streak = streakCount(data.sessions.map { it.dateMs }, now, ::floorDayLocal)
 
+    val routine = data.currentRoutine
     val exCount = data.plan.size
     val setsTotal = data.plan.sumOf { it.sets }
-    val est = Math.round(data.plan.sumOf { it.sets * (45 + settings.restDefault) / 60.0 }).toInt()
+    val est = estMinutes(data.plan, settings.restDefault)
     val rpe = Curated.INTENSITY[settings.intensity]?.rpe ?: "RPE 7–8"
+    // "Chest · Shoulders · Triceps" in the prototype was hardcoded for Push Day; derive it now.
+    val muscles = data.plan.mapNotNull { data.exercise(it.id)?.muscle }.distinct().take(3).joinToString(" · ")
+    val firstName = settings.name.trim().substringBefore(" ")
 
     Column(
         Modifier
@@ -91,7 +99,7 @@ fun HomeScreen(vm: AppViewModel) {
         ) {
             Column {
                 Text(greeting, color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.sp)
-                Text("Alex", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 24.sp)
+                Text(firstName.ifBlank { "Welcome" }, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 24.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             val gear = remember { MutableInteractionSource() }
             Box(
@@ -102,14 +110,25 @@ fun HomeScreen(vm: AppViewModel) {
                     .clickable(gear, indication = null) { vm.openSettings() },
                 contentAlignment = Alignment.Center,
             ) {
-                Text("AR", color = GfColor.Accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
+                if (settings.initials.isNotBlank()) Text(settings.initials, color = GfColor.Accent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 16.sp)
+                else Icon(msIcon("person"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
             }
         }
 
         HeroCard(
+            name = routine?.name ?: "No routine", muscles = muscles.ifBlank { "Add exercises in Build" },
             intensity = settings.intensity, rpe = rpe, exCount = exCount, sets = setsTotal, est = est,
-            onStart = { vm.startSession(data.plan) },
+            onStart = { vm.startCurrentRoutine() },
         )
+
+        val upcoming = data.routinesData.upcoming
+        if (upcoming.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            UpNextStrip(
+                upcoming = upcoming, data = data, restDefault = settings.restDefault,
+                onPick = { vm.setCurrentRoutine(it) }, onSeeAll = { vm.selectTab(com.getfit.ui.TAB_BUILD) },
+            )
+        }
 
         Spacer(Modifier.height(16.dp))
         StreakStrip(streak = streak, dayHit = week.dayHit, todayIdx = todayIdx)
@@ -142,7 +161,7 @@ fun HomeScreen(vm: AppViewModel) {
 }
 
 @Composable
-private fun HeroCard(intensity: String, rpe: String, exCount: Int, sets: Int, est: Int, onStart: () -> Unit) {
+private fun HeroCard(name: String, muscles: String, intensity: String, rpe: String, exCount: Int, sets: Int, est: Int, onStart: () -> Unit) {
     Box(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp))
             .background(GfColor.AccentGradient).padding(22.dp),
@@ -159,8 +178,8 @@ private fun HeroCard(intensity: String, rpe: String, exCount: Int, sets: Int, es
                     Text("$intensity · $rpe", color = GfColor.OnAccent, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 11.sp)
                 }
             }
-            Text("Push Day", color = GfColor.OnAccent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 29.sp, modifier = Modifier.padding(top = 8.dp))
-            Text("Chest · Shoulders · Triceps", color = GfColor.OnAccentSub, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.5.sp, modifier = Modifier.padding(top = 3.dp))
+            Text(name, color = GfColor.OnAccent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 29.sp, modifier = Modifier.padding(top = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(muscles, color = GfColor.OnAccentSub, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.5.sp, modifier = Modifier.padding(top = 3.dp))
             Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 HeroStat(exCount.toString(), "exercises")
                 HeroStat(sets.toString(), "sets")
@@ -237,6 +256,45 @@ private fun CategoryCard(name: String, count: Int, onClick: () -> Unit) {
         Column {
             Text(name, color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.sp)
             Text("$count moves", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.sp)
+        }
+    }
+}
+
+/**
+ * The routines queued after the current one, in rotation order. Tapping one makes it the next
+ * workout (the same thing the watch's Idle screen does) — the Home card and the watch both follow.
+ */
+@Composable
+private fun UpNextStrip(upcoming: List<Routine>, data: AppData, restDefault: Int, onPick: (String) -> Unit, onSeeAll: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(GfColor.Surface)
+            .border(1.dp, GfColor.Hairline06, RoundedCornerShape(22.dp)).padding(horizontal = 18.dp, vertical = 14.dp),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Up next", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.5.sp)
+            Text("Routines", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.5.sp, modifier = Modifier.clickable(onClick = onSeeAll))
+        }
+        upcoming.take(3).forEachIndexed { i, r ->
+            val press = remember { MutableInteractionSource() }
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(press, indication = null) { onPick(r.id) }.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(28.dp).clip(RoundedCornerShape(999.dp)).background(GfColor.Background).border(1.dp, GfColor.Hairline08, RoundedCornerShape(999.dp)),
+                    contentAlignment = Alignment.Center,
+                ) { Text("${i + 1}", color = GfColor.TextDim, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 12.sp) }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(r.name, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W600, fontSize = 14.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val muscles = r.items.mapNotNull { data.exercise(it.id)?.muscle }.distinct().take(3).joinToString(" · ")
+                    Text(
+                        "${r.items.size} exercises · ~${estMinutes(r.items, restDefault)} min" + if (muscles.isNotBlank()) " · $muscles" else "",
+                        color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Icon(msIcon("chevron_right"), null, tint = GfColor.TextFaint, modifier = Modifier.size(18.dp))
+            }
         }
     }
 }

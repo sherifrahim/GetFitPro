@@ -77,6 +77,7 @@ import kotlin.math.roundToInt
 fun DetailScreen(vm: AppViewModel, id: String) {
     val data by vm.data.collectAsState()
     val settings by vm.settings.collectAsState()
+    val nav by vm.nav.collectAsState()
     val ex = data.exercise(id) ?: return
     val bw = isBW(ex.equipment, ex.reps)
     val units = settings.units
@@ -84,7 +85,9 @@ fun DetailScreen(vm: AppViewModel, id: String) {
     val now = System.currentTimeMillis()
     val cnt = data.logs.count { it.exerciseId == id }
     val target = data.targets.firstOrNull { it.exId == id }
-    val inPlan = data.plan.any { it.id == id }
+    // "Add" targets the routine open in Build, else the one up next — same rule as vm.addToPlan.
+    val targetRoutine = data.routine(nav.editRoutineId) ?: data.currentRoutine
+    val inPlan = targetRoutine?.items?.any { it.id == id } == true
     val cues = remember(ex.cues) { ex.cues.split("||").filter { it.isNotBlank() } }
     val trend = remember(data.logs, id, bw) {
         analyzeTrend(
@@ -192,7 +195,7 @@ fun DetailScreen(vm: AppViewModel, id: String) {
             ) {
                 Icon(msIcon(if (inPlan) "check" else "add"), null, tint = GfColor.Accent, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(if (inPlan) "In workout" else "Add", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.5.sp)
+                Text(if (inPlan) "In routine" else "Add", color = GfColor.Text, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.5.sp)
             }
             val startI = remember { MutableInteractionSource() }
             Row(

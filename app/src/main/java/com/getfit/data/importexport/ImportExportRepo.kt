@@ -9,6 +9,8 @@ import com.getfit.data.db.SessionSetEntity
 import com.getfit.data.db.SetLogEntity
 import com.getfit.data.db.defaultReps
 import com.getfit.data.db.titleCase
+import com.getfit.data.repo.WorkoutRepo
+import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -19,6 +21,8 @@ data class ImportSummary(
     val setsImported: Int,
     val exercisesCreated: Int,
     val skippedRows: Int,
+    /** Routines created from the imported workout names (see [ImportExportRepo.importCsv]). */
+    val routinesCreated: Int = 0,
 )
 
 sealed class ImportOutcome {
@@ -35,6 +39,7 @@ class ImportExportRepo(
     private val exerciseDao: ExerciseDao,
     private val logDao: LogDao,
     private val sessionDao: SessionDao,
+    private val workoutRepo: WorkoutRepo,
 ) {
 
     suspend fun importCsv(csvText: String, existingExercises: List<ExerciseEntity>): ImportOutcome {
@@ -97,8 +102,24 @@ class ImportExportRepo(
         if (sessionSets.isNotEmpty()) sessionDao.insertSets(sessionSets)
         if (logs.isNotEmpty()) logDao.insertAll(logs)
 
+        // Hevy, Strong and FitNotes all name each workout after the routine it was started from, so
+        // the imported history doubles as the user's routine list. One routine per distinct name, built
+        // from the most recent workout of that name (the current version of the routine), skipping
+        // names the user already has and the generic "Workout" the parser assigns to unnamed rows.
+        val existingNames = workoutRepo.routines.first().routines.map { normName(it.name) }.toMutableSet()
+        var routinesCreated = 0
+        sessions.sortedByDescending { it.dateMs }.forEach { s ->
+            val key = normName(s.name)
+            if (key.isBlank() || key == "workout" || key in existingNames) return@forEach
+            val items = WorkoutRepo.routineItemsFromSets(sessionSets.filter { it.sessionId == s.id })
+            if (items.isEmpty()) return@forEach
+            workoutRepo.createRoutine(s.name, items)
+            existingNames += key
+            routinesCreated++
+        }
+
         return ImportOutcome.Success(
-            ImportSummary(parsed.format, sessions.size, setsImported, newExercises.size, parsed.skippedRows),
+            ImportSummary(parsed.format, sessions.size, setsImported, newExercises.size, parsed.skippedRows, routinesCreated),
         )
     }
 

@@ -30,6 +30,7 @@ import com.getfit.data.wear.ActionKind
 import com.getfit.data.wear.toWearSnapshot
 import com.getfit.di.AppContainer
 import com.getfit.domain.Best
+import com.getfit.domain.HrPoint
 import com.getfit.domain.LoggedSet
 import com.getfit.domain.Units
 import com.getfit.domain.bestFor
@@ -63,19 +64,23 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     private val aiGateway = AiGateway(container.secureKeyStore)
 
     val data: StateFlow<AppData> = combine(
-        exerciseRepo.exercises, exerciseRepo.logs, progressRepo.sessions,
-        progressRepo.targets, workoutRepo.plan,
-    ) { ex, logs, sessions, targets, plan ->
-        val byId = ex.associateBy { it.id }
-        val logsByEx = logs.groupBy { it.exerciseId }
-        val bestMap = HashMap<String, Best>()
-        logsByEx.forEach { (id, ls) ->
-            val e = byId[id] ?: return@forEach
-            bestFor(ls.map { LoggedSet(it.exerciseId, it.weight, it.reps, it.dateMs) }, isBW(e.equipment, e.reps))
-                ?.let { bestMap[id] = it }
-        }
-        AppData(ex, logs, sessions, targets, plan, bestMap, loaded = true)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppData())
+        combine(
+            exerciseRepo.exercises, exerciseRepo.logs, progressRepo.sessions,
+            progressRepo.targets, workoutRepo.routines,
+        ) { ex, logs, sessions, targets, routines ->
+            val byId = ex.associateBy { it.id }
+            val logsByEx = logs.groupBy { it.exerciseId }
+            val bestMap = HashMap<String, Best>()
+            logsByEx.forEach { (id, ls) ->
+                val e = byId[id] ?: return@forEach
+                bestFor(ls.map { LoggedSet(it.exerciseId, it.weight, it.reps, it.dateMs) }, isBW(e.equipment, e.reps))
+                    ?.let { bestMap[id] = it }
+            }
+            AppData(ex, logs, sessions, targets, routines, emptyList(), bestMap, loaded = true)
+        },
+        progressRepo.measurements,
+    ) { d, measurements -> d.copy(measurements = measurements) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppData())
 
     val settings: StateFlow<Settings> =
         settingsStore.flow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), Settings())
@@ -137,16 +142,52 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun openSettings() = _nav.update { it.copy(settingsOpen = true) }
     fun closeSettings() = _nav.update { it.copy(settingsOpen = false) }
 
-    // ---- plan ----
+    // ---- routines ----
+    /** Plan edits from Detail ("Add to workout") target the routine being edited, else the current one. */
+    private fun targetRoutineId(): String? = _nav.value.editRoutineId
+
     fun addToPlan(id: String) = viewModelScope.launch {
         val ex = data.value.exercise(id) ?: exerciseRepo.byId(id) ?: return@launch
-        val added = workoutRepo.addToPlan(id, ex.reps)
-        toast(if (added) "Added to Push Day" else "Already in workout", if (added) "add_circle" else "info")
+        val rid = targetRoutineId()
+        val added = workoutRepo.addToPlan(id, ex.reps, routineId = rid)
+        val name = (data.value.routine(rid) ?: data.value.currentRoutine)?.name ?: "workout"
+        toast(if (added) "Added to $name" else "Already in $name", if (added) "add_circle" else "info")
     }
-    fun removeFromPlan(id: String) = viewModelScope.launch { workoutRepo.removeFromPlan(id) }
-    fun movePlan(index: Int, dir: Int) = viewModelScope.launch { workoutRepo.movePlan(index, dir) }
-    fun setSets(id: String, delta: Int) = viewModelScope.launch { workoutRepo.setSets(id, delta) }
+    fun removeFromPlan(id: String) = viewModelScope.launch { workoutRepo.removeFromPlan(id, targetRoutineId()) }
+    fun movePlan(index: Int, dir: Int) = viewModelScope.launch { workoutRepo.movePlan(index, dir, targetRoutineId()) }
+    fun setSets(id: String, delta: Int) = viewModelScope.launch { workoutRepo.setSets(id, delta, targetRoutineId()) }
+    fun setReps(id: String, reps: String) = viewModelScope.launch { workoutRepo.setReps(id, reps, targetRoutineId()) }
     fun setIntensity(v: String) = viewModelScope.launch { settingsStore.setIntensity(v) }
+
+    fun openRoutineEditor(id: String) = _nav.update { it.copy(tab = TAB_BUILD, editRoutineId = id, routineMenuId = null) }
+    fun closeRoutineEditor() = _nav.update { it.copy(editRoutineId = null) }
+    fun openRoutineMenu(id: String) = _nav.update { it.copy(routineMenuId = id) }
+    fun closeRoutineMenu() = _nav.update { it.copy(routineMenuId = null) }
+
+    fun createRoutine(name: String) = viewModelScope.launch {
+        val r = workoutRepo.createRoutine(name)
+        openRoutineEditor(r.id)
+    }
+    fun renameRoutine(id: String, name: String) = viewModelScope.launch { workoutRepo.renameRoutine(id, name) }
+    fun duplicateRoutine(id: String) = viewModelScope.launch {
+        workoutRepo.duplicateRoutine(id); closeRoutineMenu(); toast("Routine duplicated", "content_copy")
+    }
+    fun deleteRoutine(id: String) = viewModelScope.launch {
+        val ok = workoutRepo.deleteRoutine(id)
+        closeRoutineMenu()
+        if (_nav.value.editRoutineId == id) closeRoutineEditor()
+        toast(if (ok) "Routine deleted" else "Keep at least one routine", if (ok) "delete" else "info")
+    }
+    fun moveRoutine(index: Int, dir: Int) = viewModelScope.launch { workoutRepo.moveRoutine(index, dir) }
+    /** "Do this one next" — Home's card and the watch's Idle screen follow it. */
+    fun setCurrentRoutine(id: String) = viewModelScope.launch {
+        workoutRepo.setCurrentRoutine(id); closeRoutineMenu()
+        data.value.routine(id)?.let { toast("${it.name} is up next", "event_upcoming") }
+    }
+    fun saveSessionAsRoutine(sessionId: String) = viewModelScope.launch {
+        val r = workoutRepo.routineFromSession(sessionId)
+        toast(if (r != null) "Saved as routine \"${r.name}\"" else "Nothing to save", if (r != null) "playlist_add_check" else "info")
+    }
 
     // ---- settings ----
     fun toggleUnits() = viewModelScope.launch {
@@ -231,9 +272,29 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     val sessionController = SessionController(container, viewModelScope) { text, icon -> toast(text, icon) }
     val session get() = sessionController.state
 
-    fun startSession(items: List<PlanItemData>) { sessionController.start(items) }
-    fun startSingle(id: String, reps: String) { sessionController.start(listOf(PlanItemData(id, 3, reps))) }
+    fun startRoutine(id: String) {
+        val r = data.value.routine(id) ?: return
+        if (r.items.isEmpty()) { toast("Add an exercise first", "info"); return }
+        closeRoutineEditor()
+        sessionController.start(r)
+    }
+    fun startCurrentRoutine() { data.value.currentRoutine?.let { startRoutine(it.id) } }
+    fun startSingle(id: String, reps: String) {
+        val name = data.value.exercise(id)?.name ?: "Workout"
+        sessionController.start(listOf(PlanItemData(id, 3, reps)), name = name)
+    }
     fun endSession() = viewModelScope.launch { sessionController.endAndSave(); selectTab(TAB_PROGRESS) }
+
+    // ---- history ----
+    fun openSessionDetail(id: String) = _nav.update { it.copy(sessionDetailId = id) }
+    fun closeSessionDetail() = _nav.update { it.copy(sessionDetailId = null) }
+    fun deleteSession(id: String) = viewModelScope.launch {
+        workoutRepo.deleteSession(id)
+        _nav.update { if (it.sessionDetailId == id) it.copy(sessionDetailId = null) else it }
+        toast("Workout deleted", "delete")
+    }
+    suspend fun sessionSets(id: String) = workoutRepo.sessionSets(id)
+    suspend fun sessionHeartRate(id: String) = workoutRepo.sessionHeartRate(id)
 
     // ---- wear OS companion (mirror session state to a paired watch, apply actions/heart rate it
     // sends back) — see docs/wear-companion-design.md. Placed here, after sessionController exists,
@@ -245,10 +306,12 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     private val wearListener: MessageClient.OnMessageReceivedListener
 
     init {
+        // The snapshot also carries the routine list, so the watch's Idle screen can offer "start
+        // Pull Day" and "make Legs next" without the phone app being open. Routines change rarely
+        // and the send is deduped on identical bytes, so folding them in costs nothing per tick.
         viewModelScope.launch {
-            sessionController.state.collect { s ->
-                container.phoneWearSync.sendSnapshot(toWearSnapshot(s, settings.value.units))
-            }
+            combine(sessionController.state, workoutRepo.routines, settings) { s, r, st -> Triple(s, r, st) }
+                .collect { (s, r, st) -> container.phoneWearSync.sendSnapshot(toWearSnapshot(s, st.units, r)) }
         }
         wearListener = container.phoneWearSync.listen(
             onAction = { action ->
@@ -258,11 +321,24 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                     ActionKind.ADJUST_REST -> sessionController.addRest(action.restDeltaSec)
                     // The watch app just came to the foreground and wants the current state — including
                     // "no session" (active = false), so a stale Active screen clears too.
-                    ActionKind.REQUEST_STATE ->
-                        container.phoneWearSync.sendSnapshot(toWearSnapshot(sessionController.state.value, settings.value.units), force = true)
+                    ActionKind.REQUEST_STATE -> container.phoneWearSync.sendSnapshot(
+                        toWearSnapshot(sessionController.state.value, settings.value.units, data.value.routinesData),
+                        force = true,
+                    )
+                    // Routine picked on the wrist: same code paths as the phone's own buttons.
+                    ActionKind.SELECT_ROUTINE -> viewModelScope.launch { workoutRepo.setCurrentRoutine(action.routineId) }
+                    ActionKind.START_ROUTINE -> {
+                        if (sessionController.state.value == null) {
+                            val id = action.routineId.ifBlank { data.value.currentRoutine?.id.orEmpty() }
+                            startRoutine(id)
+                        }
+                    }
                 }
             },
-            onHeartRate = { batch -> batch.samples.lastOrNull()?.let { _liveHeartRateBpm.value = it.bpm } },
+            onHeartRate = { batch ->
+                batch.samples.lastOrNull()?.let { _liveHeartRateBpm.value = it.bpm }
+                sessionController.recordHeartRate(batch.samples.map { HrPoint(it.atMs, Math.round(it.bpm).toInt()) })
+            },
         )
     }
 
@@ -398,6 +474,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                     val msg = buildString {
                         append("Imported ${s.setsImported} sets across ${s.sessionsImported} sessions from ${s.format.label}")
                         if (s.exercisesCreated > 0) append(" — added ${s.exercisesCreated} new exercises")
+                        if (s.routinesCreated > 0) append(" — created ${s.routinesCreated} routines from the workout names")
                         if (s.skippedRows > 0) append(" (skipped ${s.skippedRows} unrecognized rows)")
                     }
                     _importExport.update { it.copy(busy = false, lastResult = msg, lastError = null) }

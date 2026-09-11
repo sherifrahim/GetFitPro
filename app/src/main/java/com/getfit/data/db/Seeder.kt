@@ -52,5 +52,7 @@ object Seeder {
         db.sessionDao().clearSets()
         db.sessionDao().clearSessions()
         db.targetDao().clear()
+        db.heartRateDao().clear()
+        db.measurementDao().clear()
     }
 }

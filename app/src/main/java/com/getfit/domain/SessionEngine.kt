@@ -33,6 +33,23 @@ data class LoggedSetFull(val id: String, val name: String, val weight: Double, v
 @Serializable
 data class PrItem(val id: String, val name: String, val value: String)
 
+@Serializable
+data class HrPoint(val atMs: Long, val bpm: Int)
+
+/** Bucket size for [SessionState.hr]; see [addHeartRate]. */
+const val HR_BUCKET_MS = 5_000L
+
+/**
+ * Merges new watch samples into the trace, keeping the LAST reading per 5s bucket. Samples arrive
+ * in ~8s batches and may overlap the previous batch, so this is idempotent on re-delivery.
+ */
+fun addHeartRate(s: SessionState, samples: List<HrPoint>): SessionState {
+    if (samples.isEmpty()) return s
+    val byBucket = LinkedHashMap<Long, HrPoint>()
+    (s.hr + samples).sortedBy { it.atMs }.forEach { p -> if (p.bpm > 0) byBucket[p.atMs / HR_BUCKET_MS] = p }
+    return s.copy(hr = byBucket.values.toList())
+}
+
 enum class Phase { WORK, REST, DONE }
 
 @Serializable
@@ -58,6 +75,12 @@ data class SessionState(
     val pausedAccumMs: Long = 0,
     val pauseBeganAtMs: Long = 0, // 0 = not currently paused
     val restEndAtMs: Long = 0,    // meaningful only while phase == REST
+    // Routine context (v2). [name] is what the saved history record is called; [routineId] is ""
+    // for an ad-hoc single-exercise session. [hr] is the watch heart-rate trace, downsampled to one
+    // point per 5s so persisting the state on every tap stays cheap.
+    val name: String = "Workout",
+    val routineId: String = "",
+    val hr: List<HrPoint> = emptyList(),
 ) {
     val current: SessionItem get() = items[idx]
 }

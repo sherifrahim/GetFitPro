@@ -3,6 +3,10 @@
 
     <uses-feature android:name="android.hardware.type.watch" />
     <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <!-- Wear OS 5+/Android 16 gates Health Services heart rate behind the Health Connect permission
+         as well as BODY_SENSORS; without it ExerciseClient logs a SecurityException per sample and
+         the phone never sees a bpm. Requested at runtime alongside BODY_SENSORS in MainActivity. -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
 

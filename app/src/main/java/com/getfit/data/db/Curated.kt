@@ -119,6 +119,25 @@ object Curated {
         PlanItem("lateral", 3, "12"), PlanItem("dip", 3, "12"),
     )
 
+    /**
+     * The routines a fresh install starts with. Push Day is the prototype's DEFAULT_PLAN verbatim;
+     * Pull and Legs complete a classic three-day rotation from the same curated exercises, so every
+     * default routine has demo GIFs, cues and prefilled weights on day one.
+     */
+    data class DefaultRoutine(val id: String, val name: String, val items: List<PlanItem>)
+    const val DEFAULT_ROUTINE_ID = "r_push"
+    val DEFAULT_ROUTINES = listOf(
+        DefaultRoutine(DEFAULT_ROUTINE_ID, "Push Day", DEFAULT_PLAN),
+        DefaultRoutine(
+            "r_pull", "Pull Day",
+            listOf(PlanItem("pullup", 4, "6"), PlanItem("row", 4, "8"), PlanItem("pulldown", 3, "10"), PlanItem("curl", 3, "12")),
+        ),
+        DefaultRoutine(
+            "r_legs", "Leg Day",
+            listOf(PlanItem("squat", 4, "6"), PlanItem("rdl", 3, "8"), PlanItem("legpress", 3, "12"), PlanItem("lunge", 3, "10"), PlanItem("plank", 3, "45s")),
+        ),
+    )
+
     /** Exercises offered in the "New target" sheet (proto GOAL_EX, L718). */
     val GOAL_EX = listOf("bench", "squat", "ohp", "row", "rdl", "pulldown", "curl", "incline", "swing")
 

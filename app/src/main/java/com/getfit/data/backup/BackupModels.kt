@@ -30,16 +30,22 @@ data class BackupFile(
     val version: Int = VERSION,
     @SerialName("created_at_ms") val createdAtMs: Long = 0,
     val settings: BackupSettings = BackupSettings(),
+    /** Pre-routines files carry a single [plan]; it is read back as the Push Day routine. */
     val plan: List<BackupPlanItem> = emptyList(),
+    val routines: List<BackupRoutine> = emptyList(),
+    @SerialName("current_routine_id") val currentRoutineId: String = "",
     val exercises: List<BackupExercise> = emptyList(),
     val sessions: List<BackupSession> = emptyList(),
     @SerialName("session_sets") val sessionSets: List<BackupSessionSet> = emptyList(),
     val logs: List<BackupLog> = emptyList(),
     val targets: List<BackupTarget> = emptyList(),
+    @SerialName("heart_rate") val heartRate: List<BackupHeartRate> = emptyList(),
+    val measurements: List<BackupMeasurement> = emptyList(),
 ) {
     /** Everything a restore would write — what the confirmation prompt should quote. */
     val totalRecords: Int
-        get() = sessions.size + sessionSets.size + logs.size + targets.size + plan.size + exercises.size
+        get() = sessions.size + sessionSets.size + logs.size + targets.size + plan.size + routines.size +
+            exercises.size + heartRate.size + measurements.size
 
     companion object {
         const val FORMAT = "forge.backup"
@@ -66,10 +72,34 @@ data class BackupSettings(
     @SerialName("ai_provider") val aiProvider: String = "anthropic",
     @SerialName("compat_base_url") val compatBaseUrl: String = "",
     @SerialName("compat_model") val compatModel: String = "",
+    val name: String = "",
+    @SerialName("body_weight_kg") val bodyWeightKg: Double = 0.0,
+    @SerialName("height_cm") val heightCm: Int = 0,
+    @SerialName("birth_year") val birthYear: Int = 0,
+    val sex: String = "",
+    @SerialName("weekly_goal") val weeklyGoal: Int = 5,
+    @SerialName("keep_awake") val keepAwake: Boolean = false,
+    @SerialName("pr_notify") val prNotify: Boolean = true,
+    @SerialName("week_starts_monday") val weekStartsMonday: Boolean = true,
 )
 
 @Serializable
 data class BackupPlanItem(val id: String, val sets: Int, val reps: String)
+
+@Serializable
+data class BackupRoutine(val id: String, val name: String, val items: List<BackupPlanItem>, val note: String = "")
+
+@Serializable
+data class BackupHeartRate(@SerialName("session_id") val sessionId: String, @SerialName("at_ms") val atMs: Long, val bpm: Int)
+
+@Serializable
+data class BackupMeasurement(
+    val id: String,
+    @SerialName("date_ms") val dateMs: Long,
+    @SerialName("weight_kg") val weightKg: Double,
+    @SerialName("body_fat_pct") val bodyFatPct: Double? = null,
+    val note: String = "",
+)
 
 @Serializable
 data class BackupExercise(
@@ -95,6 +125,10 @@ data class BackupSession(
     @SerialName("total_sets") val totalSets: Int,
     val volume: Int,
     val prs: Int,
+    @SerialName("routine_id") val routineId: String = "",
+    @SerialName("avg_bpm") val avgBpm: Int = 0,
+    @SerialName("max_bpm") val maxBpm: Int = 0,
+    val calories: Int = 0,
 )
 
 @Serializable

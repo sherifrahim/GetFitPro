@@ -2,6 +2,10 @@ package com.getfit.data.backup
 
 import com.getfit.data.db.ExerciseDao
 import com.getfit.data.db.ExerciseEntity
+import com.getfit.data.db.HeartRateDao
+import com.getfit.data.db.HeartRateSampleEntity
+import com.getfit.data.db.MeasurementDao
+import com.getfit.data.db.MeasurementEntity
 import com.getfit.data.db.LogDao
 import com.getfit.data.db.SessionDao
 import com.getfit.data.db.SessionEntity
@@ -10,7 +14,9 @@ import com.getfit.data.db.SetLogEntity
 import com.getfit.data.db.TargetDao
 import com.getfit.data.db.TargetEntity
 import com.getfit.data.prefs.PlanItemData
-import com.getfit.data.prefs.PlanStore
+import com.getfit.data.prefs.Routine
+import com.getfit.data.prefs.RoutinesData
+import com.getfit.data.prefs.RoutinesStore
 import com.getfit.data.prefs.SettingsStore
 import java.io.File
 import kotlinx.coroutines.flow.first
@@ -36,8 +42,10 @@ class BackupRepo(
     private val logDao: LogDao,
     private val sessionDao: SessionDao,
     private val targetDao: TargetDao,
+    private val heartRateDao: HeartRateDao,
+    private val measurementDao: MeasurementDao,
     private val settingsStore: SettingsStore,
-    private val planStore: PlanStore,
+    private val routinesStore: RoutinesStore,
     private val filesDir: File,
 ) {
     private val dir: File get() = File(filesDir, "backups")
@@ -47,7 +55,9 @@ class BackupRepo(
 
     suspend fun buildBackup(now: Long = System.currentTimeMillis()): BackupFile {
         val settings = settingsStore.flow.first()
-        val plan = planStore.flow.first()
+        val routinesData = routinesStore.flow.first()
+        val heartRate = heartRateDao.allOnce()
+        val measurements = measurementDao.allOnce()
         val sessions = sessionDao.allOnce()
         val sessionSets = sessionDao.allSetsOnce()
         val logs = logDao.allOnce()
@@ -59,7 +69,7 @@ class BackupRepo(
             sessionSets.forEach { add(it.exerciseId) }
             logs.forEach { add(it.exerciseId) }
             targets.forEach { add(it.exId) }
-            plan.forEach { add(it.id) }
+            routinesData.routines.forEach { r -> r.items.forEach { add(it.id) } }
         }
         val exercises = if (referenced.isEmpty()) emptyList() else exerciseDao.byIds(referenced.toList())
 
@@ -77,8 +87,21 @@ class BackupRepo(
                 aiProvider = settings.aiProvider,
                 compatBaseUrl = settings.compatBaseUrl,
                 compatModel = settings.compatModel,
+                name = settings.name,
+                bodyWeightKg = settings.bodyWeightKg,
+                heightCm = settings.heightCm,
+                birthYear = settings.birthYear,
+                sex = settings.sex,
+                weeklyGoal = settings.weeklyGoal,
+                keepAwake = settings.keepAwake,
+                prNotify = settings.prNotify,
+                weekStartsMonday = settings.weekStartsMonday,
             ),
-            plan = plan.map { BackupPlanItem(it.id, it.sets, it.reps) },
+            // `plan` is left empty on write: it only exists so pre-routines files still restore.
+            routines = routinesData.routines.map { r ->
+                BackupRoutine(r.id, r.name, r.items.map { BackupPlanItem(it.id, it.sets, it.reps) }, r.note)
+            },
+            currentRoutineId = routinesData.currentId,
             exercises = exercises.map {
                 BackupExercise(
                     id = it.id, name = it.name, muscle = it.muscle, equipment = it.equipment,
@@ -87,7 +110,7 @@ class BackupRepo(
                 )
             },
             sessions = sessions.map {
-                BackupSession(it.id, it.dateMs, it.name, it.durationSec, it.totalSets, it.volume, it.prs)
+                BackupSession(it.id, it.dateMs, it.name, it.durationSec, it.totalSets, it.volume, it.prs, it.routineId, it.avgBpm, it.maxBpm, it.calories)
             },
             sessionSets = sessionSets.map {
                 BackupSessionSet(it.sessionId, it.exerciseId, it.name, it.weight, it.reps)
@@ -96,6 +119,8 @@ class BackupRepo(
             targets = targets.map {
                 BackupTarget(it.id, it.exId, it.target, it.start, it.startDMs, it.weeks)
             },
+            heartRate = heartRate.map { BackupHeartRate(it.sessionId, it.atMs, it.bpm) },
+            measurements = measurements.map { BackupMeasurement(it.id, it.dateMs, it.weightKg, it.bodyFatPct, it.note) },
         )
     }
 
@@ -168,10 +193,12 @@ class BackupRepo(
             sessionDao.clearSessions()
             logDao.clear()
             targetDao.clear()
+            heartRateDao.clear()
+            measurementDao.clear()
 
             backup.sessions.forEach {
                 sessionDao.insertSession(
-                    SessionEntity(it.id, it.dateMs, it.name, it.durationSec, it.totalSets, it.volume, it.prs),
+                    SessionEntity(it.id, it.dateMs, it.name, it.durationSec, it.totalSets, it.volume, it.prs, it.routineId, it.avgBpm, it.maxBpm, it.calories),
                 )
             }
             if (backup.sessionSets.isNotEmpty()) {
@@ -188,7 +215,14 @@ class BackupRepo(
                 )
             }
 
-            planStore.set(backup.plan.map { PlanItemData(it.id, it.sets, it.reps) })
+            if (backup.heartRate.isNotEmpty()) {
+                heartRateDao.insertAll(backup.heartRate.map { HeartRateSampleEntity(0, it.sessionId, it.atMs, it.bpm) })
+            }
+            if (backup.measurements.isNotEmpty()) {
+                measurementDao.insertAll(backup.measurements.map { MeasurementEntity(it.id, it.dateMs, it.weightKg, it.bodyFatPct, it.note) })
+            }
+
+            routinesStore.set(routinesFrom(backup))
 
             with(backup.settings) {
                 settingsStore.setUnits(units)
@@ -205,6 +239,15 @@ class BackupRepo(
                 settingsStore.setAiProvider(aiProvider)
                 settingsStore.setCompatBaseUrl(compatBaseUrl)
                 settingsStore.setCompatModel(compatModel)
+                settingsStore.setName(name)
+                settingsStore.setBodyWeightKg(bodyWeightKg)
+                settingsStore.setHeightCm(heightCm)
+                settingsStore.setBirthYear(birthYear)
+                settingsStore.setSex(sex)
+                settingsStore.setWeeklyGoal(weeklyGoal)
+                settingsStore.setKeepAwake(keepAwake)
+                settingsStore.setPrNotify(prNotify)
+                settingsStore.setWeekStartsMonday(weekStartsMonday)
             }
             // Never restore `seeded` from the file. The library on THIS install is already seeded,
             // and a false value would make the next launch re-seed demo history on top of the data
@@ -217,4 +260,19 @@ class BackupRepo(
             onFailure = { RestoreOutcome.Failure(it.message ?: "Restore failed.") },
         )
     }
+}
+
+/**
+ * Routines from a backup file. A pre-routines file (format 1 with only `plan`) becomes the
+ * default three-routine rotation with the saved plan as Push Day — the same rule RoutinesStore
+ * applies to the legacy DataStore key, so an old backup restores to the same state an old install
+ * upgrades to.
+ */
+internal fun routinesFrom(backup: BackupFile): RoutinesData {
+    if (backup.routines.isNotEmpty()) {
+        val routines = backup.routines.map { r -> Routine(r.id, r.name, r.items.map { PlanItemData(it.id, it.sets, it.reps) }, r.note) }
+        val current = backup.currentRoutineId.takeIf { id -> routines.any { it.id == id } } ?: routines.first().id
+        return RoutinesData(routines, current)
+    }
+    return RoutinesStore.defaults(backup.plan.map { PlanItemData(it.id, it.sets, it.reps) }.ifEmpty { null })
 }

@@ -1,5 +1,6 @@
 package com.getfit.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -45,6 +46,31 @@ data class SessionEntity(
     val totalSets: Int,
     val volume: Int,
     val prs: Int,
+    // v2. Which routine the session was started from ("" for ad-hoc / imported), and the
+    // watch-derived heart-rate summary + calorie estimate Hevy shows per workout. 0 = not recorded.
+    @ColumnInfo(defaultValue = "") val routineId: String = "",
+    @ColumnInfo(defaultValue = "0") val avgBpm: Int = 0,
+    @ColumnInfo(defaultValue = "0") val maxBpm: Int = 0,
+    @ColumnInfo(defaultValue = "0") val calories: Int = 0,
+)
+
+/** One heart-rate reading from the watch during a session (v2) — the workout detail's HR graph. */
+@Entity(tableName = "heart_rate_samples", indices = [Index("sessionId")])
+data class HeartRateSampleEntity(
+    @PrimaryKey(autoGenerate = true) val rowId: Long = 0,
+    val sessionId: String,
+    val atMs: Long,
+    val bpm: Int,
+)
+
+/** A body measurement entry (v2): weight and optionally body-fat, one row per logging. */
+@Entity(tableName = "measurements", indices = [Index("dateMs")])
+data class MeasurementEntity(
+    @PrimaryKey val id: String,
+    val dateMs: Long,
+    val weightKg: Double,
+    val bodyFatPct: Double? = null,
+    val note: String = "",
 )
 
 @Entity(tableName = "session_sets", indices = [Index("sessionId")])

@@ -1,6 +1,7 @@
 package com.getfit.data.wear
 
 import android.content.Context
+import com.getfit.data.prefs.RoutinesData
 import com.getfit.domain.Phase
 import com.getfit.domain.SessionState
 import com.google.android.gms.wearable.MessageClient
@@ -65,8 +66,10 @@ class PhoneWearSync(context: Context) {
 
 /** Maps the phone's SessionState (SessionEngine.kt) to the compact wire snapshot. Null state (no
  *  active session) becomes `active = false`, which is all the watch's Idle screen checks for. */
-fun toWearSnapshot(state: SessionState?, units: String): SessionSnapshot {
-    if (state == null) return SessionSnapshot(active = false)
+fun toWearSnapshot(state: SessionState?, units: String, routines: RoutinesData = RoutinesData()): SessionSnapshot {
+    val wearRoutines = routines.routines.map { WearRoutine(it.id, it.name, it.items.size, it.setsTotal) }
+    val currentId = routines.current?.id.orEmpty()
+    if (state == null) return SessionSnapshot(active = false, routines = wearRoutines, currentRoutineId = currentId)
     val item = state.current
     return SessionSnapshot(
         // true for the whole session including its brief DONE phase — the watch shows a "Session
@@ -93,5 +96,8 @@ fun toWearSnapshot(state: SessionState?, units: String): SessionSnapshot {
         pausedAccumMs = state.pausedAccumMs,
         completedSets = state.completedSets,
         totalSets = state.totalSets,
+        routines = wearRoutines,
+        currentRoutineId = currentId,
+        sessionName = state.name,
     )
 }

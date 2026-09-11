@@ -44,5 +44,14 @@ fun msIcon(name: String): ImageVector = when (name) {
     "lock" -> ForgeIcons.Lock
     "info" -> ForgeIcons.Info
     "fitness_center", "exercise" -> ForgeIcons.FitnessCenter
+    "more_horiz" -> ForgeIcons.MoreHoriz
+    "edit" -> ForgeIcons.Edit
+    "content_copy" -> ForgeIcons.ContentCopy
+    "event_upcoming" -> ForgeIcons.EventUpcoming
+    "favorite" -> ForgeIcons.Favorite
+    "person" -> ForgeIcons.Person
+    "calendar_month" -> ForgeIcons.CalendarMonth
+    "playlist_add_check" -> ForgeIcons.PlaylistAddCheck
+    "psychology" -> ForgeIcons.Psychology
     else -> ForgeIcons.FitnessCenter
 }

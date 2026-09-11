@@ -8,7 +8,7 @@ import androidx.room.Room
 import com.getfit.data.db.GetFitDatabase
 import com.getfit.data.backup.BackupRepo
 import com.getfit.data.db.Seeder
-import com.getfit.data.prefs.PlanStore
+import com.getfit.data.prefs.RoutinesStore
 import com.getfit.data.prefs.SettingsStore
 import com.getfit.data.importexport.ImportExportRepo
 import com.getfit.data.repo.ExerciseRepo
@@ -32,26 +32,26 @@ class AppContainer(val appContext: Context) {
 
     val db: GetFitDatabase = Room.databaseBuilder(
         appContext, GetFitDatabase::class.java, "getfit.db",
-    ).build()
+    ).addMigrations(GetFitDatabase.MIGRATION_1_2).build()
 
     val settingsStore = SettingsStore(appContext.dataStore)
-    val planStore = PlanStore(appContext.dataStore)
+    val routinesStore = RoutinesStore(appContext.dataStore)
     val sessionStore = com.getfit.data.prefs.SessionStore(appContext.dataStore)
     val secureKeyStore = SecureKeyStore(appContext.dataStore)
     val syncStore = SyncStore(appContext.dataStore)
 
     val backupRepo = BackupRepo(
-        db.exerciseDao(), db.logDao(), db.sessionDao(), db.targetDao(),
-        settingsStore, planStore, appContext.filesDir,
+        db.exerciseDao(), db.logDao(), db.sessionDao(), db.targetDao(), db.heartRateDao(), db.measurementDao(),
+        settingsStore, routinesStore, appContext.filesDir,
     )
     // Sync uploads the backup document, so it depends on backupRepo; the data repos below depend
     // on sync (to flag changes), hence this ordering.
     val syncRepo = SyncRepo(syncStore, secureKeyStore, backupRepo, appScope)
 
     val exerciseRepo = ExerciseRepo(db.exerciseDao(), db.logDao())
-    val workoutRepo = WorkoutRepo(planStore, db.exerciseDao(), db.logDao(), db.sessionDao(), syncRepo)
-    val progressRepo = ProgressRepo(db.sessionDao(), db.targetDao(), syncRepo)
-    val importExportRepo = ImportExportRepo(db.exerciseDao(), db.logDao(), db.sessionDao())
+    val workoutRepo = WorkoutRepo(routinesStore, db.exerciseDao(), db.logDao(), db.sessionDao(), db.heartRateDao(), syncRepo)
+    val progressRepo = ProgressRepo(db.sessionDao(), db.targetDao(), db.measurementDao(), syncRepo)
+    val importExportRepo = ImportExportRepo(db.exerciseDao(), db.logDao(), db.sessionDao(), workoutRepo)
     val phoneWearSync = PhoneWearSync(appContext)
 
     /** Seed the library + demo data on first launch (idempotent). */
@@ -62,10 +62,10 @@ class AppContainer(val appContext: Context) {
         }
     }
 
-    /** "Clear all data": wipe user tables + reset plan and preferences. */
+    /** "Clear all data": wipe user tables + reset routines and preferences. */
     suspend fun clearAllData() {
         Seeder.clearAll(db)
-        planStore.resetToDefault()
+        routinesStore.resetToDefault()
         settingsStore.resetToDefaults()
     }
 }

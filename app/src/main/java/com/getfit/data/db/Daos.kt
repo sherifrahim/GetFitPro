@@ -45,6 +45,11 @@ interface LogDao {
     @Query("SELECT * FROM set_logs WHERE exerciseId = :id ORDER BY dateMs DESC LIMIT 1")
     suspend fun latest(id: String): SetLogEntity?
 
+    /** Logs are stamped with their session's exact dateMs (saveSession/import both do this), so
+     *  this is how a deleted session takes its sets out of the PR history too. */
+    @Query("DELETE FROM set_logs WHERE dateMs = :dateMs")
+    suspend fun deleteAt(dateMs: Long)
+
     @Query("DELETE FROM set_logs")
     suspend fun clear()
 }
@@ -65,6 +70,18 @@ interface SessionDao {
 
     @Query("SELECT * FROM session_sets")
     suspend fun allSetsOnce(): List<SessionSetEntity>
+
+    @Query("SELECT * FROM sessions WHERE id = :id")
+    suspend fun byId(id: String): SessionEntity?
+
+    @Query("SELECT * FROM session_sets WHERE sessionId = :sessionId ORDER BY rowId ASC")
+    suspend fun setsFor(sessionId: String): List<SessionSetEntity>
+
+    @Query("DELETE FROM sessions WHERE id = :id")
+    suspend fun deleteSession(id: String)
+
+    @Query("DELETE FROM session_sets WHERE sessionId = :sessionId")
+    suspend fun deleteSetsFor(sessionId: String)
 
     @Query("DELETE FROM sessions")
     suspend fun clearSessions()
@@ -92,5 +109,44 @@ interface TargetDao {
     suspend fun delete(id: String)
 
     @Query("DELETE FROM targets")
+    suspend fun clear()
+}
+
+@Dao
+interface HeartRateDao {
+    @Insert
+    suspend fun insertAll(samples: List<HeartRateSampleEntity>)
+
+    @Query("SELECT * FROM heart_rate_samples WHERE sessionId = :sessionId ORDER BY atMs ASC")
+    suspend fun forSession(sessionId: String): List<HeartRateSampleEntity>
+
+    @Query("SELECT * FROM heart_rate_samples ORDER BY atMs ASC")
+    suspend fun allOnce(): List<HeartRateSampleEntity>
+
+    @Query("DELETE FROM heart_rate_samples WHERE sessionId = :sessionId")
+    suspend fun deleteForSession(sessionId: String)
+
+    @Query("DELETE FROM heart_rate_samples")
+    suspend fun clear()
+}
+
+@Dao
+interface MeasurementDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(m: MeasurementEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(m: List<MeasurementEntity>)
+
+    @Query("SELECT * FROM measurements ORDER BY dateMs DESC")
+    fun observeAll(): Flow<List<MeasurementEntity>>
+
+    @Query("SELECT * FROM measurements ORDER BY dateMs ASC")
+    suspend fun allOnce(): List<MeasurementEntity>
+
+    @Query("DELETE FROM measurements WHERE id = :id")
+    suspend fun delete(id: String)
+
+    @Query("DELETE FROM measurements")
     suspend fun clear()
 }

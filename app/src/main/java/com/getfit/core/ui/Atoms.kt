@@ -9,11 +9,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -138,5 +142,80 @@ fun GfToast(text: String, icon: ImageVector, modifier: Modifier = Modifier) {
             text, color = GfColor.OnLight, fontFamily = Manrope,
             fontWeight = FontWeight.W700, fontSize = 13.5.sp,
         )
+    }
+}
+
+/**
+ * The app's one text field: black well, hairline border, accent cursor. Used for routine names,
+ * rep targets, profile fields and API keys alike so every input reads the same.
+ */
+@Composable
+fun GfInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    masked: Boolean = false,
+    numeric: Boolean = false,
+    textSize: androidx.compose.ui.unit.TextUnit = 13.5.sp,
+    fontFamily: androidx.compose.ui.text.font.FontFamily = Manrope,
+) {
+    Box(
+        modifier.clip(RoundedCornerShape(14.dp)).background(GfColor.Background)
+            .border(1.dp, GfColor.Hairline08, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        if (value.isEmpty()) {
+            Text(placeholder, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = textSize)
+        }
+        androidx.compose.foundation.text.BasicTextField(
+            value = value, onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = androidx.compose.ui.text.TextStyle(color = GfColor.Text, fontFamily = fontFamily, fontWeight = FontWeight.W600, fontSize = textSize),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(GfColor.Accent),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = if (numeric) androidx.compose.ui.text.input.KeyboardType.Decimal else androidx.compose.ui.text.input.KeyboardType.Text,
+            ),
+            visualTransformation = if (masked) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** A bottom-anchored action sheet over a scrim (Hevy's "⋯" menus). Tap outside to dismiss. */
+@Composable
+fun GfSheet(title: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    Box(
+        Modifier.fillMaxSize().background(Color(0x99000000))
+            .clickable(interactionSource = null, indication = null, onClick = onDismiss),
+    ) {
+        Column(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .clickable(interactionSource = null, indication = null) {}
+                .clip(RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)).background(GfColor.Surface)
+                .padding(horizontal = 16.dp).padding(top = 10.dp, bottom = 28.dp),
+        ) {
+            Box(Modifier.align(Alignment.CenterHorizontally).size(width = 44.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(GfColor.Hairline12))
+            Text(
+                title, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 17.sp,
+                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp, bottom = 10.dp),
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            content()
+        }
+    }
+}
+
+/** One row of a [GfSheet]. */
+@Composable
+fun GfSheetRow(icon: ImageVector, label: String, destructive: Boolean = false, onClick: () -> Unit) {
+    val tint = if (destructive) GfColor.Coral else GfColor.Text
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+            .clickable(interactionSource = null, indication = null, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
+        Text(label, color = tint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 15.sp)
     }
 }
