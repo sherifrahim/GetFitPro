@@ -19,6 +19,7 @@ espresso = "3.6.1"
 wearCompose = "1.4.1"
 playServicesWearable = "19.0.0"
 healthServicesClient = "1.1.0-alpha03"
+watchfaceComplications = "1.2.1"
 guavaListenableFuture = "1.0"
 
 [libraries]
@@ -52,6 +53,7 @@ androidx-wear-compose-material = { group = "androidx.wear.compose", name = "comp
 androidx-wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wearCompose" }
 play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "playServicesWearable" }
 androidx-health-services-client = { group = "androidx.health", name = "health-services-client", version.ref = "healthServicesClient" }
+androidx-watchface-complications-data-source-ktx = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "watchfaceComplications" }
 guava-listenablefuture = { group = "com.google.guava", name = "listenablefuture", version.ref = "guavaListenableFuture" }
 
 [plugins]

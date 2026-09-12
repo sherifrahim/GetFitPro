@@ -71,6 +71,22 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Read by ForgeListenerService to decide whether a snapshot needs to launch us. */
         @Volatile var inForeground: Boolean = false
+        /** Intent extra from the complication: routine id to start on arrival ("" = whichever is next). */
+        const val EXTRA_START_ROUTINE = "com.getfit.wear.START_ROUTINE"
+    }
+
+    /** A start request from the complication, consumed by the composable once it is up. */
+    private val startRequest = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        readStartRequest(intent)
+    }
+
+    private fun readStartRequest(intent: android.content.Intent?) {
+        if (intent?.hasExtra(EXTRA_START_ROUTINE) != true) return
+        startRequest.value = intent.getStringExtra(EXTRA_START_ROUTINE).orEmpty()
+        intent.removeExtra(EXTRA_START_ROUTINE)
     }
 
     override fun onResume() {
@@ -104,9 +120,10 @@ class MainActivity : ComponentActivity() {
         val wanted = listOf(Manifest.permission.BODY_SENSORS, "android.permission.health.READ_HEART_RATE")
             .filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (wanted.isNotEmpty()) requestSensors.launch(wanted.toTypedArray())
+        readStartRequest(intent)
         setContent {
             MaterialTheme(colors = ForgeWearColors) {
-                ForgeWearApp(messenger, heartRateMonitor, store, localSession)
+                ForgeWearApp(messenger, heartRateMonitor, store, localSession, startRequest)
             }
         }
     }
@@ -124,7 +141,13 @@ class MainActivity : ComponentActivity() {
  * phone didn't answer a Start within a few seconds.
  */
 @Composable
-private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateMonitor, store: WatchStore, local: LocalSession) {
+private fun ForgeWearApp(
+    messenger: WatchMessenger,
+    heartRateMonitor: HeartRateMonitor,
+    store: WatchStore,
+    local: LocalSession,
+    startRequest: kotlinx.coroutines.flow.MutableStateFlow<String?>,
+) {
     var snapshot by remember { mutableStateOf<SessionSnapshot?>(null) }
     var bpm by remember { mutableStateOf<Double?>(null) }
     val pendingHrSamples = remember { mutableListOf<HeartRateSample>() }
@@ -207,6 +230,17 @@ private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateM
     // Start on the wrist: ask the phone first; if no active snapshot comes back within 3 s (no
     // phone in range, or its app is closed), run the routine here.
     var starting by remember { mutableStateOf<String?>(null) }
+    // Complication tap: start the requested routine (blank = the one up next) unless a session is on.
+    LaunchedEffect(Unit) {
+        startRequest.collect { req ->
+            if (req == null) return@collect
+            startRequest.value = null
+            if (snapshot?.active == true || local.active) return@collect
+            val cache = store.routines()
+            val id = req.ifBlank { snapshot?.currentRoutineId?.takeIf { it.isNotBlank() } ?: cache.currentRoutineId }
+            if (id.isNotBlank()) starting = id
+        }
+    }
     LaunchedEffect(starting) {
         val id = starting ?: return@LaunchedEffect
         messenger.sendAction(WatchAction(ActionKind.START_ROUTINE, routineId = id))

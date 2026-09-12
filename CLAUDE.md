@@ -161,6 +161,11 @@ rate via Health Services `ExerciseClient`, batched every 8s.
   maxBpm/calories, plus `heart_rate_samples` and `measurements`). Never use destructive migration —
   the user's phone carries real imported history. `AppContainer.seedOnFirstLaunch` also runs two
   one-shot upgrades gated by DataStore flags (demo-row purge, imported-muscle re-inference).
+- **Watch-face complication** (`wear/…/NextRoutineComplication.kt`, `watchface-complications-data-source-ktx`,
+  SHORT_TEXT + LONG_TEXT) — "Up next · <routine>" from the WatchStore cache; tap opens MainActivity
+  (`launchMode=singleTop`, extra `EXTRA_START_ROUTINE`) which starts it on the phone or on the wrist.
+  ForgeListenerService pushes a refresh on every snapshot. Registered as a data source; placing it
+  is done by hand in the watch face editor (the AVD editor rejects synthetic input).
 - **Home-screen widget** (`widget/NextWorkoutWidget.kt`, classic AppWidgetProvider + RemoteViews, no
   Glance) — routine up next, streak, weekly count, a Start pill that opens MainActivity with
   `EXTRA_START_ROUTINE`. Reads DataStore/Room directly (no ViewModel alive); the app calls

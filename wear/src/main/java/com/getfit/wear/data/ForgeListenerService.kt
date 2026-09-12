@@ -45,6 +45,7 @@ class ForgeListenerService : WearableListenerService() {
                 val snap = runCatching { json.decodeFromString<SessionSnapshot>(String(event.data)) }.getOrNull() ?: return
                 WatchStore(this).rememberRoutines(snap)
                 SnapshotBus.snapshot.value = snap
+                com.getfit.wear.NextRoutineComplication.refresh(this)
                 if (snap.active && !MainActivity.inForeground) {
                     startActivity(
                         Intent(this, MainActivity::class.java)

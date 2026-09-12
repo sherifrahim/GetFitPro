@@ -91,6 +91,10 @@ dependencies {
     // Anything stronger than compileOnly here (implementation/api) re-creates the duplicate-class
     // failure at package time.
     compileOnly(libs.guava.listenablefuture)
+    // Watch-face complication ("Up next: Push Day", tap to start). The -ktx artifact is coroutine
+    // based; it still transitively brings the base complications library (Guava-free), so nothing
+    // about the Guava note above changes.
+    implementation(libs.androidx.watchface.complications.data.source.ktx)
     implementation(libs.kotlinx.serialization.json)
     implementation(project(":engine"))
 
