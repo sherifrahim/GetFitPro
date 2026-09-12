@@ -20,6 +20,15 @@ class WatchMessenger(context: Context) {
 
     fun sendAction(action: WatchAction) = send(WearPaths.WATCH_ACTION, json.encodeToString(action))
     fun sendHeartRateBatch(batch: HeartRateBatch) = send(WearPaths.HEART_RATE, json.encodeToString(batch))
+    /** A workout finished on the watch alone. Sent again on every reconnect until the phone acks it. */
+    fun sendUpload(upload: WearSessionUpload) = send(WearPaths.SESSION_UPLOAD, json.encodeToString(upload))
+
+    /** Whether any phone is currently reachable over the Data Layer (Bluetooth or same Wi-Fi). */
+    fun hasConnectedNode(onResult: (Boolean) -> Unit) {
+        nodeClient.connectedNodes
+            .addOnSuccessListener { nodes -> onResult(nodes.isNotEmpty()) }
+            .addOnFailureListener { onResult(false) }
+    }
 
     private fun send(path: String, jsonBody: String) {
         val payload = jsonBody.toByteArray()

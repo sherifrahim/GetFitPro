@@ -1,7 +1,6 @@
 package com.getfit.data.wear
 
 import android.content.Context
-import com.getfit.data.prefs.RoutinesData
 import com.getfit.domain.Phase
 import com.getfit.domain.SessionState
 import com.google.android.gms.wearable.MessageClient
@@ -29,6 +28,9 @@ class PhoneWearSync(context: Context) {
      * opened, or its listener service just started) — the bytes may be identical to the last send,
      * but the watch never received that one.
      */
+    /** Tells the watch a standalone workout it uploaded is safely stored, so it can drop its copy. */
+    fun sendUploadAck(id: String) = send(WearPaths.UPLOAD_ACK, json.encodeToString(UploadAck(id)))
+
     fun sendSnapshot(snapshot: SessionSnapshot, force: Boolean = false) {
         val body = json.encodeToString(snapshot)
         if (!force && body == lastSentJson) return
@@ -66,10 +68,14 @@ class PhoneWearSync(context: Context) {
 
 /** Maps the phone's SessionState (SessionEngine.kt) to the compact wire snapshot. Null state (no
  *  active session) becomes `active = false`, which is all the watch's Idle screen checks for. */
-fun toWearSnapshot(state: SessionState?, units: String, routines: RoutinesData = RoutinesData()): SessionSnapshot {
-    val wearRoutines = routines.routines.map { WearRoutine(it.id, it.name, it.items.size, it.setsTotal) }
-    val currentId = routines.current?.id.orEmpty()
-    if (state == null) return SessionSnapshot(active = false, routines = wearRoutines, currentRoutineId = currentId)
+fun toWearSnapshot(
+    state: SessionState?,
+    units: String,
+    wearRoutines: List<WearRoutine> = emptyList(),
+    currentId: String = "",
+    restDefault: Int = 60,
+): SessionSnapshot {
+    if (state == null) return SessionSnapshot(active = false, routines = wearRoutines, currentRoutineId = currentId, restDefault = restDefault)
     val item = state.current
     return SessionSnapshot(
         // true for the whole session including its brief DONE phase — the watch shows a "Session
@@ -99,5 +105,33 @@ fun toWearSnapshot(state: SessionState?, units: String, routines: RoutinesData =
         routines = wearRoutines,
         currentRoutineId = currentId,
         sessionName = state.name,
+        restDefault = restDefault,
     )
+}
+
+/**
+ * Routines as the watch needs them, resolved from the phone's data: display-unit prefill from the
+ * last logged set (else the curated default, else 20), and current bests for on-wrist PR detection.
+ * Built once per data change (see AppViewModel), not per snapshot.
+ */
+fun toWearRoutines(
+    routines: List<com.getfit.data.prefs.Routine>,
+    exercises: Map<String, com.getfit.data.db.ExerciseEntity>,
+    lastKgByExercise: Map<String, Double>,
+    bestMap: Map<String, com.getfit.domain.Best>,
+    units: String,
+): List<WearRoutine> = routines.map { r ->
+    val items = r.items.mapNotNull { p ->
+        val e = exercises[p.id] ?: return@mapNotNull null
+        val bw = com.getfit.domain.isBW(e.equipment, e.reps)
+        val suggestKg = lastKgByExercise[p.id] ?: com.getfit.data.db.Curated.DEFAULT_WEIGHT[p.id] ?: 20.0
+        val best = bestMap[p.id]
+        WearItem(
+            id = p.id, name = e.name, muscle = e.muscle, sets = p.sets, reps = p.reps, bw = bw,
+            suggestW = com.getfit.domain.Units.roundDisplay(com.getfit.domain.Units.toDisplay(suggestKg, units)),
+            equipment = e.equipment, superset = p.superset,
+            bestW = best?.let { com.getfit.domain.Units.toDisplay(it.weight, units) } ?: 0.0, bestReps = best?.reps ?: 0,
+        )
+    }
+    WearRoutine(r.id, r.name, r.items.size, r.setsTotal, items)
 }

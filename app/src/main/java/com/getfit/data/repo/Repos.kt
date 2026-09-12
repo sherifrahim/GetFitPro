@@ -189,9 +189,10 @@ class WorkoutRepo(
         maxBpm: Int = 0,
         calories: Int = 0,
         heartRate: List<HrPoint> = emptyList(),
+        /** Caller-supplied id (a watch upload keeps its own so retries dedupe); default "h<now>". */
+        id: String = "h$now",
     ) {
         if (sets.isEmpty()) return
-        val id = "h$now"
         sessionDao.insertSession(
             SessionEntity(id, now, name, durationSec, sets.size, volume, prs, routineId, avgBpm, maxBpm, calories),
         )

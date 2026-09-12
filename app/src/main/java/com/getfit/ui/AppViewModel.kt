@@ -33,6 +33,9 @@ import com.getfit.data.importexport.ImportOutcome
 import com.getfit.data.prefs.PlanItemData
 import com.getfit.data.prefs.Settings
 import com.getfit.data.wear.ActionKind
+import com.getfit.data.wear.SessionSnapshot
+import com.getfit.data.wear.WearRoutine
+import com.getfit.data.wear.toWearRoutines
 import com.getfit.data.wear.toWearSnapshot
 import com.getfit.di.AppContainer
 import com.getfit.domain.Best
@@ -389,13 +392,30 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
 
     private val wearListener: MessageClient.OnMessageReceivedListener
 
+    /**
+     * Routines resolved for the watch (prefill weights, bests) — recomputed only when the data or
+     * units change, never per session tick. Also what a standalone watch session runs from.
+     */
+    private val wearRoutines: StateFlow<List<WearRoutine>> = combine(data, settings) { d, st ->
+        val lastKg = HashMap<String, Double>()
+        d.logs.forEach { l -> lastKg[l.exerciseId] = l.weight }   // logs are date-ascending: last write wins
+        toWearRoutines(d.routines, d.exercises.associateBy { it.id }, lastKg, d.bestMap, st.units)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private fun snapshotNow(): SessionSnapshot = toWearSnapshot(
+        sessionController.state.value, settings.value.units, wearRoutines.value,
+        data.value.currentRoutine?.id.orEmpty(), settings.value.restDefault,
+    )
+
     init {
-        // The snapshot also carries the routine list, so the watch's Idle screen can offer "start
-        // Pull Day" and "make Legs next" without the phone app being open. Routines change rarely
-        // and the send is deduped on identical bytes, so folding them in costs nothing per tick.
+        // The snapshot also carries the routine list (with items), so the watch's Idle screen can
+        // offer "start Pull Day" / "make Legs next" and run a workout on its own if the phone is
+        // out of reach. Routines change rarely and the send is deduped on identical bytes, so
+        // folding them in costs nothing per tick.
         viewModelScope.launch {
-            combine(sessionController.state, workoutRepo.routines, settings) { s, r, st -> Triple(s, r, st) }
-                .collect { (s, r, st) -> container.phoneWearSync.sendSnapshot(toWearSnapshot(s, st.units, r)) }
+            combine(sessionController.state, wearRoutines, data, settings) { s, wr, d, st ->
+                toWearSnapshot(s, st.units, wr, d.currentRoutine?.id.orEmpty(), st.restDefault)
+            }.collect { container.phoneWearSync.sendSnapshot(it) }
         }
         wearListener = container.phoneWearSync.listen(
             onAction = { action ->
@@ -403,12 +423,11 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
                     ActionKind.DONE_SET -> sessionController.doneSet()
                     ActionKind.SKIP_REST -> sessionController.skip()
                     ActionKind.ADJUST_REST -> sessionController.addRest(action.restDeltaSec)
+                    ActionKind.ADJUST_WEIGHT -> if (action.delta > 0) sessionController.incW() else sessionController.decW()
+                    ActionKind.ADJUST_REPS -> if (action.delta > 0) sessionController.incR() else sessionController.decR()
                     // The watch app just came to the foreground and wants the current state — including
                     // "no session" (active = false), so a stale Active screen clears too.
-                    ActionKind.REQUEST_STATE -> container.phoneWearSync.sendSnapshot(
-                        toWearSnapshot(sessionController.state.value, settings.value.units, data.value.routinesData),
-                        force = true,
-                    )
+                    ActionKind.REQUEST_STATE -> container.phoneWearSync.sendSnapshot(snapshotNow(), force = true)
                     // Routine picked on the wrist: same code paths as the phone's own buttons.
                     ActionKind.SELECT_ROUTINE -> viewModelScope.launch { workoutRepo.setCurrentRoutine(action.routineId) }
                     ActionKind.START_ROUTINE -> {

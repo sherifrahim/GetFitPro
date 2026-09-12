@@ -13,6 +13,9 @@ object WearPaths {
     const val SESSION_SNAPSHOT = "/forge/session"
     const val WATCH_ACTION = "/forge/action"
     const val HEART_RATE = "/forge/heartrate"
+    // Standalone watch workouts: the watch uploads a finished session, the phone acknowledges by id.
+    const val SESSION_UPLOAD = "/forge/upload"
+    const val UPLOAD_ACK = "/forge/upload-ack"
 }
 
 @Serializable
@@ -51,13 +54,34 @@ data class SessionSnapshot(
     val currentRoutineId: String = "",
     // Name of the running session, shown on the Active/Rest screens. "" on older phones.
     val sessionName: String = "",
+    // Rest length the phone would use, so a standalone watch session rests the same way.
+    val restDefault: Int = 60,
 )
 
-/** A routine as the watch needs it: enough to list and pick, never the exercises themselves. */
+/**
+ * A routine as the watch needs it. [items] is everything a standalone session needs to run the
+ * shared engine on the wrist: prefilled weights (display units), bodyweight flags and current bests
+ * for PR detection, all resolved by the phone from its log.
+ */
 @Serializable
-data class WearRoutine(val id: String, val name: String, val exercises: Int, val sets: Int)
+data class WearRoutine(val id: String, val name: String, val exercises: Int, val sets: Int, val items: List<WearItem> = emptyList())
 
-enum class ActionKind { DONE_SET, SKIP_REST, ADJUST_REST, REQUEST_STATE, SELECT_ROUTINE, START_ROUTINE }
+@Serializable
+data class WearItem(
+    val id: String,
+    val name: String,
+    val muscle: String,
+    val sets: Int,
+    val reps: String,
+    val bw: Boolean,
+    val suggestW: Double,
+    val equipment: String = "",
+    val superset: Boolean = false,
+    val bestW: Double = 0.0,
+    val bestReps: Int = 0,
+)
+
+enum class ActionKind { DONE_SET, SKIP_REST, ADJUST_REST, REQUEST_STATE, SELECT_ROUTINE, START_ROUTINE, ADJUST_WEIGHT, ADJUST_REPS }
 
 /**
  * Action taken on the watch, sent phone-ward. The phone applies it exactly like a tap on its own
@@ -68,7 +92,7 @@ enum class ActionKind { DONE_SET, SKIP_REST, ADJUST_REST, REQUEST_STATE, SELECT_
  * blank = whichever is current).
  */
 @Serializable
-data class WatchAction(val kind: ActionKind, val restDeltaSec: Int = 0, val routineId: String = "")
+data class WatchAction(val kind: ActionKind, val restDeltaSec: Int = 0, val routineId: String = "", val delta: Int = 0)
 
 @Serializable
 data class HeartRateSample(val bpm: Double, val atMs: Long)
@@ -77,3 +101,28 @@ data class HeartRateSample(val bpm: Double, val atMs: Long)
  *  cost in most watch apps, so this watch buffers locally and flushes every ~8s. */
 @Serializable
 data class HeartRateBatch(val samples: List<HeartRateSample>)
+
+/**
+ * A workout finished on the watch without the phone, sent when the two reconnect. Weights are in
+ * [units] (the watch works in display units like the phone's session screen); the phone converts to
+ * kg, recomputes calories with the profile, and replies with [UploadAck]. [id] is stable across
+ * retries so a duplicate delivery is a no-op on the phone.
+ */
+@Serializable
+data class WearSessionUpload(
+    val id: String,
+    val name: String,
+    val routineId: String,
+    val startedAtMs: Long,
+    val durationSec: Int,
+    val units: String,
+    val sets: List<WearLoggedSet>,
+    val prs: Int,
+    val hr: List<HeartRateSample> = emptyList(),
+)
+
+@Serializable
+data class WearLoggedSet(val exerciseId: String, val name: String, val weight: Double, val reps: Int, val bw: Boolean)
+
+@Serializable
+data class UploadAck(val id: String)

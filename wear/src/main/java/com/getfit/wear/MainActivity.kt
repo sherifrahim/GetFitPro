@@ -11,21 +11,26 @@ import android.os.VibratorManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,21 +40,30 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.material.Button
+import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.CircularProgressIndicator
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import com.getfit.domain.HrPoint
 import com.getfit.wear.data.ActionKind
 import com.getfit.wear.data.HeartRateBatch
 import com.getfit.wear.data.HeartRateMonitor
 import com.getfit.wear.data.HeartRateSample
+import com.getfit.wear.data.LocalSession
 import com.getfit.wear.data.SessionSnapshot
 import com.getfit.wear.data.SnapshotBus
 import com.getfit.wear.data.WatchAction
 import com.getfit.wear.data.WatchMessenger
+import com.getfit.wear.data.WatchStore
 import com.getfit.wear.data.WearPhase
+import com.getfit.wear.data.localSnapshot
 import com.getfit.wear.theme.ForgeWearColors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -63,8 +77,9 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         inForeground = true
         // Ask the phone for the current session, so opening the app mid-workout shows it immediately
-        // instead of waiting for the phone's next state change.
+        // instead of waiting for the phone's next state change. Also the moment to retry uploads.
         messenger.sendAction(WatchAction(ActionKind.REQUEST_STATE))
+        store.pendingUploads().forEach { messenger.sendUpload(it) }
     }
 
     override fun onPause() {
@@ -74,6 +89,9 @@ class MainActivity : ComponentActivity() {
 
     private val messenger by lazy { WatchMessenger(this) }
     private val heartRateMonitor by lazy { HeartRateMonitor(this) }
+    private val store by lazy { WatchStore(this) }
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val localSession by lazy { LocalSession(store, appScope) }
 
     // Must be registered unconditionally before the activity leaves CREATED — doing it here as a
     // property initializer (not inside onCreate's body) is the safe place for that.
@@ -88,7 +106,7 @@ class MainActivity : ComponentActivity() {
         if (wanted.isNotEmpty()) requestSensors.launch(wanted.toTypedArray())
         setContent {
             MaterialTheme(colors = ForgeWearColors) {
-                ForgeWearApp(messenger, heartRateMonitor)
+                ForgeWearApp(messenger, heartRateMonitor, store, localSession)
             }
         }
     }
@@ -96,17 +114,23 @@ class MainActivity : ComponentActivity() {
 
 /**
  * Top-level state holder + screen router. No ViewModel here on purpose — this activity's state is
- * simple enough (one nullable snapshot, one nullable BPM reading) that adding a new dependency
- * (lifecycle-viewmodel-compose, not already on this module's classpath) for it isn't worth the risk
- * given zero build verification elsewhere in this module; plain remember/DisposableEffect/
- * LaunchedEffect covers it.
+ * simple enough (one nullable snapshot, one nullable BPM reading, one local session) that plain
+ * remember/LaunchedEffect covers it without a new dependency on this module.
+ *
+ * Two sources of truth, one screen set:
+ *  - a snapshot from the phone (mirror mode — the phone runs the engine, we render and send taps);
+ *  - a [LocalSession] (standalone mode — no phone in range, the watch runs the shared engine itself).
+ * Mirror wins whenever the phone reports an active session; the standalone one only starts when the
+ * phone didn't answer a Start within a few seconds.
  */
 @Composable
-private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateMonitor) {
+private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateMonitor, store: WatchStore, local: LocalSession) {
     var snapshot by remember { mutableStateOf<SessionSnapshot?>(null) }
     var bpm by remember { mutableStateOf<Double?>(null) }
     val pendingHrSamples = remember { mutableListOf<HeartRateSample>() }
     val context = LocalContext.current
+    val localState by local.state.collectAsState()
+    var pendingCount by remember { mutableIntStateOf(store.pendingUploads().size) }
 
     // Snapshots arrive via ForgeListenerService (app open or not) and land on SnapshotBus; this is
     // the only consumer. A new snapshot landing while the watch was showing Rest and now shows Work
@@ -118,16 +142,33 @@ private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateM
                 vibrateRestEnd(context)
             }
             snapshot = newSnapshot
+            // A reachable phone means pending standalone workouts can go now.
+            if (newSnapshot != null) store.pendingUploads().forEach { messenger.sendUpload(it) }
         }
     }
+    LaunchedEffect(Unit) { SnapshotBus.acked.collect { pendingCount = store.pendingUploads().size } }
+
+    // Local rest-end cue: same vibration the mirror gets from the phone's transition.
+    var lastLocalPhase by remember { mutableStateOf<WearPhase?>(null) }
+    val localSnap = localState?.let { localSnapshot(it, local.units) }
+    LaunchedEffect(localSnap?.phase) {
+        if (lastLocalPhase == WearPhase.REST && localSnap?.phase == WearPhase.WORK) vibrateRestEnd(context)
+        lastLocalPhase = localSnap?.phase
+    }
+
+    // Which session is on screen: the phone's if it has one, else ours.
+    val phoneActive = snapshot?.active == true
+    val shown: SessionSnapshot? = if (phoneActive) snapshot else localSnap
+    val isLocal = !phoneActive && localSnap != null
 
     // Heart rate only runs while a workout is actually in progress (not Idle, not the brief DONE
     // summary) — starting/stopping ExerciseClient outside that window would just burn battery for
     // no reason. Samples are buffered locally and flushed as one batch every 8s (see
     // docs/wear-companion-design.md section 3): continuous per-sample streaming over the radio is
-    // the real battery cost in most watch apps, not the sensor sampling itself.
-    LaunchedEffect(snapshot?.active, snapshot?.phase) {
-        val trackingActive = snapshot?.active == true && snapshot?.phase != WearPhase.DONE
+    // the real battery cost in most watch apps, not the sensor sampling itself. In standalone mode
+    // the same samples feed the local session instead of the radio.
+    LaunchedEffect(shown?.active, shown?.phase, isLocal) {
+        val trackingActive = shown?.active == true && shown.phase != WearPhase.DONE
         if (!trackingActive) {
             heartRateMonitor.stop()
             bpm = null
@@ -141,8 +182,10 @@ private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateM
             while (isActive) {
                 delay(8_000)
                 if (pendingHrSamples.isNotEmpty()) {
-                    messenger.sendHeartRateBatch(HeartRateBatch(pendingHrSamples.toList()))
+                    val batch = pendingHrSamples.toList()
                     pendingHrSamples.clear()
+                    if (isLocal) local.recordHeartRate(batch.map { HrPoint(it.atMs, Math.round(it.bpm).toInt()) })
+                    else messenger.sendHeartRateBatch(HeartRateBatch(batch))
                 }
             }
         } finally {
@@ -151,9 +194,8 @@ private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateM
     }
 
     // Ticks purely to trigger recomposition — the actual elapsed/rest-left values are always
-    // recomputed from the snapshot's wall-clock anchors (elapsedSecFrom/restLeftSecFrom below), the
-    // same pattern SessionEngine.kt uses on the phone, so a delayed or missed tick self-corrects
-    // instead of drifting.
+    // recomputed from the snapshot's wall-clock anchors (restLeftSecFrom below), the same pattern
+    // SessionEngine.kt uses on the phone, so a delayed or missed tick self-corrects instead of drifting.
     var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (isActive) {
@@ -162,25 +204,59 @@ private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateM
         }
     }
 
-    val s = snapshot
+    // Start on the wrist: ask the phone first; if no active snapshot comes back within 3 s (no
+    // phone in range, or its app is closed), run the routine here.
+    var starting by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(starting) {
+        val id = starting ?: return@LaunchedEffect
+        messenger.sendAction(WatchAction(ActionKind.START_ROUTINE, routineId = id))
+        delay(3_000)
+        if (snapshot?.active != true) {
+            val cache = store.routines()
+            cache.routines.firstOrNull { it.id == id }?.let { local.start(it, cache) }
+        }
+        starting = null
+    }
+
+    val s = shown
     when {
+        starting != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(indicatorColor = ForgeWearColors.primary, modifier = Modifier.size(32.dp))
+                Spacer(Modifier.height(8.dp))
+                Text("Starting…", style = MaterialTheme.typography.caption1, color = ForgeWearColors.onBackground)
+            }
+        }
         s == null || !s.active -> IdleScreen(
-            snapshot = s,
-            onStart = { messenger.sendAction(WatchAction(ActionKind.START_ROUTINE, routineId = it)) },
+            snapshot = snapshot,
+            cache = store.routines(),
+            pendingUploads = pendingCount,
+            onStart = { starting = it },
             onSelect = { messenger.sendAction(WatchAction(ActionKind.SELECT_ROUTINE, routineId = it)) },
         )
-        s.phase == WearPhase.DONE -> SessionEndScreen(s)
+        s.phase == WearPhase.DONE -> SessionEndScreen(
+            snapshot = s,
+            local = isLocal,
+            onFinish = { local.finish()?.let { messenger.sendUpload(it) }; pendingCount = store.pendingUploads().size },
+        )
         s.phase == WearPhase.REST -> RestScreen(
             snapshot = s,
             bpm = bpm,
             nowMs = nowMs,
-            onSkip = { messenger.sendAction(WatchAction(ActionKind.SKIP_REST)) },
-            onAddRest = { messenger.sendAction(WatchAction(ActionKind.ADJUST_REST, restDeltaSec = 15)) },
+            onSkip = { if (isLocal) local.skip() else messenger.sendAction(WatchAction(ActionKind.SKIP_REST)) },
+            onAddRest = { if (isLocal) local.addRest(15) else messenger.sendAction(WatchAction(ActionKind.ADJUST_REST, restDeltaSec = 15)) },
         )
         else -> ActiveExerciseScreen(
             snapshot = s,
             bpm = bpm,
-            onDone = { messenger.sendAction(WatchAction(ActionKind.DONE_SET)) },
+            local = isLocal,
+            onDone = {
+                if (isLocal) { if (local.doneSet()) vibrateRestEnd(context) }
+                else messenger.sendAction(WatchAction(ActionKind.DONE_SET))
+            },
+            onWeight = { d -> if (isLocal) local.adjustW(d) else messenger.sendAction(WatchAction(ActionKind.ADJUST_WEIGHT, delta = d)) },
+            onReps = { d -> if (isLocal) local.adjustR(d) else messenger.sendAction(WatchAction(ActionKind.ADJUST_REPS, delta = d)) },
+            onEnd = { if (isLocal) { local.finish()?.let { messenger.sendUpload(it) }; pendingCount = store.pendingUploads().size } },
         )
     }
 }
@@ -188,20 +264,29 @@ private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateM
 /**
  * No session running. With routines on hand this is the watch's own start screen: the one up next
  * on top as a Start chip, the others below — tapping one of those makes IT the next workout (the
- * phone's Home card follows), then Start begins it. Without routines (phone app never opened since
- * the update) it falls back to pointing at the phone.
+ * phone's Home card follows), then Start begins it — on the phone if it's in range, else right
+ * here. Without routines (phone app never opened since the update) it falls back to pointing at
+ * the phone.
  */
 @Composable
-private fun IdleScreen(snapshot: SessionSnapshot?, onStart: (String) -> Unit, onSelect: (String) -> Unit) {
-    val routines = snapshot?.routines.orEmpty()
-    val current = routines.firstOrNull { it.id == snapshot?.currentRoutineId } ?: routines.firstOrNull()
+private fun IdleScreen(
+    snapshot: SessionSnapshot?,
+    cache: WatchStore.RoutineCache,
+    pendingUploads: Int,
+    onStart: (String) -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    // Live list from the phone if it just sent one, else what we cached last time.
+    val routines = snapshot?.routines?.takeIf { it.isNotEmpty() } ?: cache.routines
+    val currentId = snapshot?.currentRoutineId?.takeIf { it.isNotBlank() } ?: cache.currentRoutineId
+    val current = routines.firstOrNull { it.id == currentId } ?: routines.firstOrNull()
     if (current == null) {
         Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Forge", color = ForgeWearColors.primary, style = MaterialTheme.typography.title2)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Open Forge on your phone to start a workout",
+                    "Open Forge on your phone once to load your routines",
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.caption2,
                     color = ForgeWearColors.onBackground,
@@ -244,37 +329,71 @@ private fun IdleScreen(snapshot: SessionSnapshot?, onStart: (String) -> Unit, on
                 )
             }
         }
+        if (pendingUploads > 0) {
+            item {
+                Text(
+                    "$pendingUploads workout${if (pendingUploads == 1) "" else "s"} waiting for the phone",
+                    style = MaterialTheme.typography.caption3, color = ForgeWearColors.onSurfaceVariant,
+                    textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun ActiveExerciseScreen(snapshot: SessionSnapshot, bpm: Double?, onDone: () -> Unit) {
-    Box(Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.Center) {
+private fun ActiveExerciseScreen(
+    snapshot: SessionSnapshot,
+    bpm: Double?,
+    local: Boolean,
+    onDone: () -> Unit,
+    onWeight: (Int) -> Unit,
+    onReps: (Int) -> Unit,
+    onEnd: () -> Unit,
+) {
+    Box(Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 snapshot.exerciseName,
                 style = MaterialTheme.typography.caption1,
                 color = ForgeWearColors.primary,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "Set ${snapshot.setNum}/${snapshot.totalSetsForExercise}",
+                "Set ${snapshot.setNum}/${snapshot.totalSetsForExercise}" + if (local) " · on watch" else "",
                 style = MaterialTheme.typography.caption2,
                 color = ForgeWearColors.onBackground,
             )
-            Text(
-                if (snapshot.bodyweight) "${snapshot.curReps} reps"
-                else "${fmtWeight(snapshot.curWeight)} ${snapshot.units} × ${snapshot.curReps}",
-                style = MaterialTheme.typography.display3,
-                color = ForgeWearColors.onBackground,
-            )
-            Spacer(Modifier.height(6.dp))
-            Chip(onClick = onDone, label = { Text("Done") })
-            bpm?.let {
-                Spacer(Modifier.height(4.dp))
-                Text("${it.toInt()} bpm", style = MaterialTheme.typography.caption2, color = ForgeWearColors.onSurfaceVariant)
+            // Steppers: weight (unless bodyweight) and reps, the phone's stepper cards in 2 rows.
+            if (!snapshot.bodyweight) {
+                StepperRow("${fmtWeight(snapshot.curWeight)} ${snapshot.units}", onDec = { onWeight(-1) }, onInc = { onWeight(1) })
+            }
+            StepperRow("${snapshot.curReps} reps", onDec = { onReps(-1) }, onInc = { onReps(1) })
+            Spacer(Modifier.height(2.dp))
+            Chip(onClick = onDone, label = { Text("Done") }, colors = ChipDefaults.primaryChipColors())
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                bpm?.let {
+                    Text("${it.toInt()} bpm", style = MaterialTheme.typography.caption2, color = ForgeWearColors.onSurfaceVariant)
+                }
+                if (local) {
+                    Text(
+                        "End", style = MaterialTheme.typography.caption2, color = ForgeWearColors.onSurfaceVariant,
+                        modifier = Modifier.padding(4.dp).clickable(onClick = onEnd),
+                    )
+                }
             }
         }
+    }
+}
+
+/** −  value  + on one line, with the smallest wear buttons so the Done chip keeps room. */
+@Composable
+private fun StepperRow(value: String, onDec: () -> Unit, onInc: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Button(onClick = onDec, modifier = Modifier.size(ButtonDefaults.SmallButtonSize), colors = ButtonDefaults.secondaryButtonColors()) { Text("−") }
+        Text(value, style = MaterialTheme.typography.title3, color = ForgeWearColors.onBackground, modifier = Modifier.width(96.dp), textAlign = TextAlign.Center, maxLines = 1)
+        Button(onClick = onInc, modifier = Modifier.size(ButtonDefaults.SmallButtonSize), colors = ButtonDefaults.secondaryButtonColors()) { Text("+") }
     }
 }
 
@@ -311,7 +430,7 @@ private fun RestScreen(
 }
 
 @Composable
-private fun SessionEndScreen(snapshot: SessionSnapshot) {
+private fun SessionEndScreen(snapshot: SessionSnapshot, local: Boolean, onFinish: () -> Unit) {
     Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -326,6 +445,17 @@ private fun SessionEndScreen(snapshot: SessionSnapshot) {
                 style = MaterialTheme.typography.caption1,
                 color = ForgeWearColors.onBackground,
             )
+            if (local) {
+                Spacer(Modifier.height(8.dp))
+                Chip(onClick = onFinish, label = { Text("Save") }, colors = ChipDefaults.primaryChipColors())
+                Text(
+                    "Syncs to the phone when it's near",
+                    style = MaterialTheme.typography.caption3, color = ForgeWearColors.onSurfaceVariant,
+                    textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp),
+                )
+            } else {
+                Text("Finish on the phone", style = MaterialTheme.typography.caption3, color = ForgeWearColors.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+            }
         }
     }
 }

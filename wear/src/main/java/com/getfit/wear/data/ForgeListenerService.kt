@@ -12,9 +12,12 @@ import kotlinx.serialization.json.Json
  * receives it, app open or not) and the activity (which renders it). A process-wide StateFlow is
  * enough: the service and the activity always share a process, and the phone re-sends the full
  * snapshot on request, so nothing here needs to survive process death.
+ *
+ * [acked] carries upload ids the phone has confirmed, so the activity can refresh its pending count.
  */
 object SnapshotBus {
     val snapshot = MutableStateFlow<SessionSnapshot?>(null)
+    val acked = MutableStateFlow<String?>(null)
 }
 
 /**
@@ -26,20 +29,31 @@ object SnapshotBus {
  * change. On a real Galaxy Watch that read as "the watch just says open Forge on your phone".
  *
  * On an active snapshot this launches the activity so the workout appears on the wrist by itself.
- * Registered in the manifest with a path filter, so Play Services only wakes us for our own path.
+ * Every snapshot also refreshes the routine cache that standalone workouts run from, and upload
+ * acks retire pending sessions. Registered in the manifest with path filters, so Play Services
+ * only wakes us for our own paths.
  */
 class ForgeListenerService : WearableListenerService() {
     private val json = Json { ignoreUnknownKeys = true }
 
     override fun onMessageReceived(event: MessageEvent) {
-        if (event.path != WearPaths.SESSION_SNAPSHOT) return
-        val snap = runCatching { json.decodeFromString<SessionSnapshot>(String(event.data)) }.getOrNull() ?: return
-        SnapshotBus.snapshot.value = snap
-        if (snap.active && !MainActivity.inForeground) {
-            startActivity(
-                Intent(this, MainActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            )
+        when (event.path) {
+            WearPaths.SESSION_SNAPSHOT -> {
+                val snap = runCatching { json.decodeFromString<SessionSnapshot>(String(event.data)) }.getOrNull() ?: return
+                WatchStore(this).rememberRoutines(snap)
+                SnapshotBus.snapshot.value = snap
+                if (snap.active && !MainActivity.inForeground) {
+                    startActivity(
+                        Intent(this, MainActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                    )
+                }
+            }
+            WearPaths.UPLOAD_ACK -> {
+                val ack = runCatching { json.decodeFromString<UploadAck>(String(event.data)) }.getOrNull() ?: return
+                WatchStore(this).removeUpload(ack.id)
+                SnapshotBus.acked.value = ack.id
+            }
         }
     }
 }
