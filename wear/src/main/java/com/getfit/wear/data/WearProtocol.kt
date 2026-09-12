@@ -79,6 +79,8 @@ data class WearItem(
     val superset: Boolean = false,
     val bestW: Double = 0.0,
     val bestReps: Int = 0,
+    /** "60×8, 60×8, 62.5×6" — the previous session's sets for this lift, already in display units. */
+    val last: String = "",
 )
 
 enum class ActionKind { DONE_SET, SKIP_REST, ADJUST_REST, REQUEST_STATE, SELECT_ROUTINE, START_ROUTINE, ADJUST_WEIGHT, ADJUST_REPS }

@@ -25,7 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +49,7 @@ import com.getfit.core.ui.pressScale
 import com.getfit.domain.Phase
 import com.getfit.domain.Plates
 import com.getfit.domain.canRemoveItem
+import com.getfit.core.ui.GfInput
 import com.getfit.core.ui.GfSheet
 import com.getfit.core.ui.GfSheetRow
 import com.getfit.domain.Units
@@ -79,6 +82,7 @@ fun SessionScreen(vm: AppViewModel) {
                 GfSheetRow(msIcon("add_circle"), "Add an exercise to this workout") { vm.startSessionPick("add") }
                 GfSheetRow(msIcon("content_copy"), "Replace this exercise") { vm.startSessionPick("replace") }
                 GfSheetRow(msIcon("skip_next"), "Skip the rest of this exercise") { vm.sessionSkipExercise() }
+                GfSheetRow(msIcon("straighten"), if (settings.units == "kg") "Switch to lb" else "Switch to kg") { vm.toggleUnits(); vm.closeSessionMenu() }
                 if (canRemoveItem(state, state.idx)) GfSheetRow(msIcon("delete"), "Remove this exercise", destructive = true) { vm.sessionRemoveCurrent() }
             }
         }
@@ -147,6 +151,10 @@ private fun ActiveView(s: SessionState, units: String, vm: AppViewModel) {
             val bpm by vm.liveHeartRateBpm.collectAsState()
             val hr = bpm?.let { b -> " · ♥ ${b.toInt()} bpm" } ?: ""
             Text("${it.muscle} · ${fmtClock(s.elapsed)} elapsed$hr", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp))
+            // What this lift looked like last time: the previous session's sets, in today's units.
+            val data by vm.data.collectAsState()
+            val lastLine = remember(data.sessions, data.sessionSets, it.id, units, s.workStartedAtMs) { lastTimeLine(data, it.id, units, s.workStartedAtMs) }
+            if (lastLine != null) Text(lastLine, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
             // Superset partner coming up with no rest: say so before the user reaches for the timer.
             if (!isRest) nextPosition(s)?.takeIf { p -> !p.restFirst }?.let { p ->
                 Text("Superset · then ${s.items[p.idx].name}, no rest", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
@@ -192,9 +200,9 @@ private fun ActiveView(s: SessionState, units: String, vm: AppViewModel) {
             }
             Row(Modifier.fillMaxWidth().padding(bottom = 11.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (!it.bw) {
-                    StepperCard(label = "Weight", value = fmtW(s.curW), unit = units, prBadge = prPace(s), modifier = Modifier.weight(1f), onDec = { tick(); ctrl.decW() }, onInc = { tick(); ctrl.incW() })
+                    StepperCard(label = "Weight", value = fmtW(s.curW), unit = units, prBadge = prPace(s), modifier = Modifier.weight(1f), onDec = { tick(); ctrl.decW() }, onInc = { tick(); ctrl.incW() }, onType = { v -> v.toDoubleOrNull()?.let { ctrl.setW(it) } })
                 }
-                StepperCard(label = if (isTimeBased(it.reps)) "Seconds" else "Reps", value = s.curR.toString(), unit = null, prBadge = false, modifier = Modifier.weight(1f), onDec = { tick(); ctrl.decR() }, onInc = { tick(); ctrl.incR() })
+                StepperCard(label = if (isTimeBased(it.reps)) "Seconds" else "Reps", value = s.curR.toString(), unit = null, prBadge = false, modifier = Modifier.weight(1f), onDec = { tick(); ctrl.decR() }, onInc = { tick(); ctrl.incR() }, onType = { v -> v.toDoubleOrNull()?.let { ctrl.setR(it.toInt()) } })
             }
             Row(
                 Modifier.fillMaxWidth().height(58.dp).pressScale(remember { MutableInteractionSource() }, 0.98f)
@@ -222,7 +230,10 @@ private fun RestSideButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun StepperCard(label: String, value: String, unit: String?, prBadge: Boolean, modifier: Modifier, onDec: () -> Unit, onInc: () -> Unit) {
+private fun StepperCard(label: String, value: String, unit: String?, prBadge: Boolean, modifier: Modifier, onDec: () -> Unit, onInc: () -> Unit, onType: ((String) -> Unit)? = null) {
+    // Tap the number to type an exact value (Hevy's set-row fields); the steppers stay for quick nudges.
+    var typing by remember { mutableStateOf(false) }
+    var typed by remember { mutableStateOf("") }
     Column(
         modifier.clip(RoundedCornerShape(18.dp)).background(GfColor.Surface).border(1.dp, GfColor.Hairline08, RoundedCornerShape(18.dp)).padding(horizontal = 8.dp, vertical = 11.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -238,8 +249,25 @@ private fun StepperCard(label: String, value: String, unit: String?, prBadge: Bo
         Row(Modifier.fillMaxWidth().padding(top = 7.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             StepHit("remove_circle", onDec)
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(value, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 24.sp)
-                if (unit != null) Text(unit, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 10.sp)
+                if (typing && onType != null) {
+                    GfInput(
+                        value = typed, onValueChange = { v -> typed = v.filter { c -> c.isDigit() || c == '.' }.take(6) },
+                        placeholder = value, numeric = true, textSize = 18.sp, fontFamily = SpaceGrotesk,
+                        modifier = Modifier.width(88.dp).clickable(remember { MutableInteractionSource() }, indication = null) {},
+                    )
+                    Text(
+                        "Set", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 4.dp).clickable(remember { MutableInteractionSource() }, indication = null) {
+                            if (typed.isNotBlank()) onType(typed); typing = false; typed = ""
+                        },
+                    )
+                } else {
+                    Text(
+                        value, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 24.sp,
+                        modifier = if (onType != null) Modifier.clickable(remember { MutableInteractionSource() }, indication = null) { typing = true } else Modifier,
+                    )
+                    if (unit != null) Text(unit, color = GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 10.sp)
+                }
             }
             StepHit("add_circle", onInc)
         }
@@ -306,4 +334,16 @@ private fun DoneStat(value: String, label: String) {
         Text(value, color = GfColor.OnAccent, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 24.sp)
         Text(label, color = GfColor.OnAccentDim2, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 11.sp)
     }
+}
+
+/** "Last time · Tue 9 Sep: 60×8, 60×8, 62.5×6" for the previous session that included [exerciseId]. */
+internal fun lastTimeLine(data: com.getfit.ui.AppData, exerciseId: String, units: String, beforeMs: Long): String? {
+    val prev = data.sessions.filter { s -> s.dateMs < beforeMs && data.sessionSets.any { it.sessionId == s.id && it.exerciseId == exerciseId } }
+        .maxByOrNull { it.dateMs } ?: return null
+    val sets = data.sessionSets.filter { it.sessionId == prev.id && it.exerciseId == exerciseId }
+    if (sets.isEmpty()) return null
+    val bw = sets.all { it.weight == 0.0 }
+    val body = sets.joinToString(", ") { r -> if (bw) "${r.reps}" else "${Units.fmtDisplay(r.weight, units)}×${r.reps}" }
+    val day = java.text.SimpleDateFormat("EEE d MMM", java.util.Locale.getDefault()).format(java.util.Date(prev.dateMs))
+    return "Last time · $day: $body" + if (bw) " reps" else ""
 }

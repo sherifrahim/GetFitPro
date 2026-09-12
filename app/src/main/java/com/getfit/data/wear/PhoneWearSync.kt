@@ -120,6 +120,7 @@ fun toWearRoutines(
     lastKgByExercise: Map<String, Double>,
     bestMap: Map<String, com.getfit.domain.Best>,
     units: String,
+    lastSetsByExercise: Map<String, String> = emptyMap(),
 ): List<WearRoutine> = routines.map { r ->
     val items = r.items.mapNotNull { p ->
         val e = exercises[p.id] ?: return@mapNotNull null
@@ -131,6 +132,7 @@ fun toWearRoutines(
             suggestW = com.getfit.domain.Units.roundDisplay(com.getfit.domain.Units.toDisplay(suggestKg, units)),
             equipment = e.equipment, superset = p.superset,
             bestW = best?.let { com.getfit.domain.Units.toDisplay(it.weight, units) } ?: 0.0, bestReps = best?.reps ?: 0,
+            last = lastSetsByExercise[p.id].orEmpty(),
         )
     }
     WearRoutine(r.id, r.name, r.items.size, r.setsTotal, items)

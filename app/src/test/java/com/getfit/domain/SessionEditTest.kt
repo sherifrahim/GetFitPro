@@ -79,3 +79,24 @@ class SessionEditTest {
         assertThat(r.items[0].sets).isEqualTo(1)
     }
 }
+
+class SessionUnitsTest {
+    @Test fun kg_to_lb_converts_every_weight_and_back_exactly() {
+        var s = startSession(
+            listOf(SessionItem("bench", "Bench", "Chest", sets = 2, reps = "8", bw = false, suggestW = 60.0)),
+            60, mapOf("bench" to (80.0 to 5)), now = 0L,
+        )
+        s = doneSet(s.copy(curW = 100.0), "kg", now = 1).state          // PR at 100 kg
+        val lb = convertSessionUnits(s, "kg", "lb")
+        assertThat(lb.curW).isWithin(0.01).of(220.46)
+        assertThat(lb.log.single().weight).isWithin(0.01).of(220.46)
+        assertThat(lb.preBest.getValue("bench").first).isWithin(0.01).of(220.46)
+        assertThat(lb.items.single().suggestW).isWithin(0.01).of(132.28)
+        assertThat(lb.volume).isWithin(0.1).of(100.0 * 8 * 2.2046226218)
+        assertThat(lb.newPRs.single().value).isEqualTo("220.5 lb × 8")
+        val back = convertSessionUnits(lb, "lb", "kg")
+        assertThat(back.curW).isWithin(0.01).of(100.0)
+        assertThat(back.log.single().weight).isWithin(0.01).of(100.0)
+        assertThat(convertSessionUnits(s, "kg", "kg")).isEqualTo(s)
+    }
+}

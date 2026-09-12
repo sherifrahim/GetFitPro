@@ -87,3 +87,28 @@ fun skipExercise(s: SessionState, now: Long = System.currentTimeMillis()): Sessi
     // advanceFromRest is exactly "the set at (idx, setNum) is over, go to what follows" — DONE when nothing does.
     return advanceFromRest(trimmed, fromTick = false, now = now)
 }
+
+/**
+ * Switch the running session's display unit. Every weight the state holds is in the display unit
+ * (curW, prefill, logged sets, pre-session bests, running volume), so a kg<->lb toggle mid-workout
+ * must convert all of them together or the record saved at the end would be off by 2.2x. The PR
+ * labels in [SessionState.newPRs] are re-rendered in the new unit too.
+ */
+fun convertSessionUnits(s: SessionState, from: String, to: String): SessionState {
+    if (from == to) return s
+    fun cv(v: Double): Double = Units.roundDisplay(Units.toDisplay(Units.fromDisplay(v, from), to))
+    val items = s.items.map { it.copy(suggestW = cv(it.suggestW)) }
+    val log = s.log.map { it.copy(weight = cv(it.weight)) }
+    val preBest = s.preBest.mapValues { (_, p) -> cv(p.first) to p.second }
+    val bwById = s.items.associate { it.id to it.bw }
+    val newPRs = s.newPRs.map { pr ->
+        val bw = bwById[pr.id] == true
+        val last = log.lastOrNull { it.id == pr.id }
+        if (bw || last == null) pr else pr.copy(value = "${fmtW(last.weight)} $to × ${last.reps}")
+    }
+    return s.copy(
+        items = items, log = log, preBest = preBest, newPRs = newPRs,
+        curW = cv(s.curW),
+        volume = Units.toDisplay(Units.fromDisplay(s.volume, from), to),
+    )
+}

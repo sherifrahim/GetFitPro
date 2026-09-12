@@ -250,6 +250,8 @@ private fun ForgeWearApp(messenger: WatchMessenger, heartRateMonitor: HeartRateM
             snapshot = s,
             bpm = bpm,
             local = isLocal,
+            lastLine = (snapshot?.routines?.takeIf { it.isNotEmpty() } ?: store.routines().routines)
+                .flatMap { it.items }.firstOrNull { it.name == s.exerciseName }?.last?.takeIf { it.isNotBlank() },
             onDone = {
                 if (isLocal) { if (local.doneSet()) vibrateRestEnd(context) }
                 else messenger.sendAction(WatchAction(ActionKind.DONE_SET))
@@ -346,12 +348,14 @@ private fun ActiveExerciseScreen(
     snapshot: SessionSnapshot,
     bpm: Double?,
     local: Boolean,
+    lastLine: String?,
     onDone: () -> Unit,
     onWeight: (Int) -> Unit,
     onReps: (Int) -> Unit,
     onEnd: () -> Unit,
 ) {
-    Box(Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.Center) {
+    // Horizontal padding keeps the name and steppers inside the round mask on 1.2" faces.
+    Box(Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 snapshot.exerciseName,
@@ -359,12 +363,16 @@ private fun ActiveExerciseScreen(
                 color = ForgeWearColors.primary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
             Text(
                 "Set ${snapshot.setNum}/${snapshot.totalSetsForExercise}" + if (local) " · on watch" else "",
                 style = MaterialTheme.typography.caption2,
                 color = ForgeWearColors.onBackground,
             )
+            lastLine?.let {
+                Text("Last: $it", style = MaterialTheme.typography.caption3, color = ForgeWearColors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
+            }
             // Steppers: weight (unless bodyweight) and reps, the phone's stepper cards in 2 rows.
             if (!snapshot.bodyweight) {
                 StepperRow("${fmtWeight(snapshot.curWeight)} ${snapshot.units}", onDec = { onWeight(-1) }, onInc = { onWeight(1) })
@@ -390,10 +398,10 @@ private fun ActiveExerciseScreen(
 /** −  value  + on one line, with the smallest wear buttons so the Done chip keeps room. */
 @Composable
 private fun StepperRow(value: String, onDec: () -> Unit, onInc: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Button(onClick = onDec, modifier = Modifier.size(ButtonDefaults.SmallButtonSize), colors = ButtonDefaults.secondaryButtonColors()) { Text("−") }
-        Text(value, style = MaterialTheme.typography.title3, color = ForgeWearColors.onBackground, modifier = Modifier.width(96.dp), textAlign = TextAlign.Center, maxLines = 1)
-        Button(onClick = onInc, modifier = Modifier.size(ButtonDefaults.SmallButtonSize), colors = ButtonDefaults.secondaryButtonColors()) { Text("+") }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        Button(onClick = onDec, modifier = Modifier.size(ButtonDefaults.ExtraSmallButtonSize), colors = ButtonDefaults.secondaryButtonColors()) { Text("−") }
+        Text(value, style = MaterialTheme.typography.title3, color = ForgeWearColors.onBackground, modifier = Modifier.width(78.dp), textAlign = TextAlign.Center, maxLines = 1)
+        Button(onClick = onInc, modifier = Modifier.size(ButtonDefaults.ExtraSmallButtonSize), colors = ButtonDefaults.secondaryButtonColors()) { Text("+") }
     }
 }
 

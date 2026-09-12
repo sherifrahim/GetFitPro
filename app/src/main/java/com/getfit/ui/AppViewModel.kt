@@ -399,7 +399,17 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     private val wearRoutines: StateFlow<List<WearRoutine>> = combine(data, settings) { d, st ->
         val lastKg = HashMap<String, Double>()
         d.logs.forEach { l -> lastKg[l.exerciseId] = l.weight }   // logs are date-ascending: last write wins
-        toWearRoutines(d.routines, d.exercises.associateBy { it.id }, lastKg, d.bestMap, st.units)
+        // Previous session's sets per exercise, formatted for the watch's "Last:" caption.
+        val lastSets = HashMap<String, String>()
+        val sessionsById = d.sessions.associateBy { it.id }
+        d.sessionSets.groupBy { it.exerciseId }.forEach { (exId, rows) ->
+            val latest = rows.mapNotNull { r -> sessionsById[r.sessionId]?.dateMs }.maxOrNull() ?: return@forEach
+            val sid = rows.first { r -> sessionsById[r.sessionId]?.dateMs == latest }.sessionId
+            val those = rows.filter { it.sessionId == sid }
+            val bw = those.all { it.weight == 0.0 }
+            lastSets[exId] = those.joinToString(", ") { r -> if (bw) "${r.reps}" else "${Units.fmtDisplay(r.weight, st.units)}×${r.reps}" }
+        }
+        toWearRoutines(d.routines, d.exercises.associateBy { it.id }, lastKg, d.bestMap, st.units, lastSets)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private fun snapshotNow(): SessionSnapshot = toWearSnapshot(

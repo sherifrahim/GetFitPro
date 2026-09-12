@@ -9,6 +9,7 @@ import com.getfit.domain.HrPoint
 import com.getfit.domain.LoggedSet
 import com.getfit.domain.addHeartRate
 import com.getfit.domain.addItem
+import com.getfit.domain.convertSessionUnits
 import com.getfit.domain.removeItem
 import com.getfit.domain.replaceItem
 import com.getfit.domain.skipExercise
@@ -69,6 +70,13 @@ class SessionController(
     init {
         scope.launch {
             container.settingsStore.flow.collect {
+                // A kg<->lb toggle mid-session converts every weight the state holds (see
+                // convertSessionUnits) — the session works in display units end to end.
+                val prev = units
+                if (prev != it.units && _state.value != null) {
+                    _state.update { s -> s?.let { st -> convertSessionUnits(st, prev, it.units) } }
+                    persist()
+                }
                 units = it.units; autorest = it.autorest; soundOn = it.sound; hapticsOn = it.haptics; prNotify = it.prNotify
             }
         }
@@ -191,6 +199,9 @@ class SessionController(
         persist()
     }
     fun incW() { _state.update { it?.let { s -> adjustW(s, 1, units) } }; persist() }
+    /** Typed entry: an exact weight / rep count from the keyboard, on top of the steppers. */
+    fun setW(v: Double) { _state.update { it?.let { s -> s.copy(curW = Units.roundDisplay(v.coerceIn(0.0, 2000.0))) } }; persist() }
+    fun setR(v: Int) { _state.update { it?.let { s -> s.copy(curR = v.coerceIn(1, 999)) } }; persist() }
     fun decW() { _state.update { it?.let { s -> adjustW(s, -1, units) } }; persist() }
     fun incR() { _state.update { it?.let { s -> adjustR(s, 1) } }; persist() }
     fun decR() { _state.update { it?.let { s -> adjustR(s, -1) } }; persist() }
