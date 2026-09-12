@@ -1,5 +1,10 @@
 package com.getfit.wear.data
 
+import com.getfit.data.wear.WearSessionUpload
+import com.getfit.data.wear.WearPaths
+import com.getfit.data.wear.WatchAction
+import com.getfit.data.wear.SessionSnapshot
+import com.getfit.data.wear.HeartRateBatch
 import android.content.Context
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.Wearable

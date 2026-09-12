@@ -1,5 +1,8 @@
 package com.getfit.wear.data
 
+import com.getfit.data.wear.WearPaths
+import com.getfit.data.wear.UploadAck
+import com.getfit.data.wear.SessionSnapshot
 import android.content.Intent
 import com.getfit.wear.MainActivity
 import com.google.android.gms.wearable.MessageEvent

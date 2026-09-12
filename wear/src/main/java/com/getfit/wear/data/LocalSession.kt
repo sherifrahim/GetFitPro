@@ -1,5 +1,9 @@
 package com.getfit.wear.data
 
+import com.getfit.data.wear.WearSessionUpload
+import com.getfit.data.wear.WearRoutine
+import com.getfit.data.wear.WearLoggedSet
+import com.getfit.data.wear.HeartRateSample
 import com.getfit.domain.HrPoint
 import com.getfit.domain.Phase
 import com.getfit.domain.SessionItem

@@ -1,13 +1,15 @@
-package com.getfit.wear.data
+package com.getfit.data.wear
 
 import kotlinx.serialization.Serializable
 
 /**
- * Message paths for the Data Layer API's MessageClient. Deliberately duplicated on both the watch
- * (this file) and the phone (app/src/.../data/wear/WearProtocol.kt) rather than pulled from a
- * shared module — see docs/wear-companion-design.md section 1 for why. The two copies only need to
- * agree on JSON shape, not Kotlin package/class identity — that's all kotlinx.serialization cares
- * about across the wire.
+ * The phone<->watch wire protocol for the Data Layer API's MessageClient. One copy, in the shared
+ * :engine module, used by both apps (it started life duplicated on each side with a drift test
+ * holding the two together; once :engine existed for the session engine, the duplication had no
+ * reason left). Package stays `com.getfit.data.wear` so the phone's imports didn't move.
+ *
+ * Everything here is plain kotlinx.serialization JSON; add fields with defaults so an older phone or
+ * watch keeps decoding what a newer one sends.
  */
 object WearPaths {
     const val SESSION_SNAPSHOT = "/forge/session"
@@ -24,10 +26,9 @@ enum class WearPhase { WORK, REST, DONE }
 /**
  * Compact, one-shot snapshot of the phone's active session, sent whenever SessionController's
  * state actually changes — not on every 1s tick. [workStartedAtMs]/[pausedAccumMs]/[restEndAtMs]
- * are the same wall-clock anchors SessionState itself uses on the phone, so this watch can
- * recompute a live elapsed/rest-countdown display every second purely locally (see the ticker in
- * MainActivity.kt), without needing a new message each tick. [active] = false means no session
- * running; the watch shows Idle.
+ * are wall-clock anchors, the same ones SessionState itself uses (see SessionEngine.kt), so the
+ * watch can recompute a live elapsed/rest-countdown display every second purely locally, without
+ * needing a new message each tick. [active] = false means no session running; the watch shows Idle.
  */
 @Serializable
 data class SessionSnapshot(
@@ -100,7 +101,8 @@ data class WatchAction(val kind: ActionKind, val restDeltaSec: Int = 0, val rout
 data class HeartRateSample(val bpm: Double, val atMs: Long)
 
 /** Batched, not per-sample — continuous per-beat streaming over the radio is the actual battery
- *  cost in most watch apps, so this watch buffers locally and flushes every ~8s. */
+ *  cost in most watch apps, so the watch buffers locally and flushes every ~8s (see HeartRateMonitor
+ *  usage on the watch side). */
 @Serializable
 data class HeartRateBatch(val samples: List<HeartRateSample>)
 

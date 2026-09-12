@@ -1,5 +1,10 @@
 # Forge Wear OS Companion — Design
 
+> **2026-09 update:** superseded in two places. The protocol and the session engine now live in the
+> shared pure-Kotlin `:engine` module (no duplication, no drift test), and the watch runs workouts on
+> its own when the phone is out of reach (`LocalSession` + `WearSessionUpload`, see CLAUDE.md). The
+> rest of this doc — MessageClient over DataClient, the HR batching, the snapshot shape — still holds.
+
 Scope confirmed: full workout mirror on the watch (active exercise, set/rep target, rest timer,
 done/skip taps) plus live heart rate streamed back to the phone. This doc is for review before any
 build files are touched, since a new Gradle module is the highest blind-build-risk change made in

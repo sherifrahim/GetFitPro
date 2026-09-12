@@ -1,5 +1,8 @@
 package com.getfit.wear.data
 
+import com.getfit.data.wear.WearSessionUpload
+import com.getfit.data.wear.WearRoutine
+import com.getfit.data.wear.SessionSnapshot
 import android.content.Context
 import com.getfit.domain.SessionState
 import kotlinx.serialization.Serializable

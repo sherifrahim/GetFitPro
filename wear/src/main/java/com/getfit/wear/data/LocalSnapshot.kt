@@ -1,5 +1,7 @@
 package com.getfit.wear.data
 
+import com.getfit.data.wear.WearPhase
+import com.getfit.data.wear.SessionSnapshot
 import com.getfit.domain.Phase
 import com.getfit.domain.SessionState
 
