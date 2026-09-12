@@ -16,12 +16,18 @@ high-fidelity, fully-working HTML/JS prototype — `GetFit.dc.html`. That protot
 
 The Android app (Kotlin + Jetpack Compose) is otherwise built to look and behave identically.
 
-> Status: **built and running.** The phone app lives in `app/`, a Wear OS companion in `wear/`.
-> All 12 planned phases are implemented and verified on an emulator: splash → onboarding → home →
-> exercises → detail → builder → guided session → progress → settings, hydrated from Room +
-> DataStore. Since then: AI review, CSV import/export, cloud-sync groundwork (inert), a Wear OS
-> companion, rest-timer feedback, and the trend insight. Unit tests live in `app/src/test/…`
-> (**185 tests**). The build order/spec live in `docs/superpowers/`.
+> Status: **built, running on real hardware (OPPO CPH2651 + Galaxy Watch7) and pushed to
+> `sherifrahim/main`.** Three modules: the phone app in `app/`, a Wear OS companion in `wear/`, and
+> `engine/` — a pure-Kotlin module holding the session state machine (`SessionEngine.kt`,
+> `SessionEdits.kt`, `Formatters.kt`, `Units.kt`, package `com.getfit.domain`) that BOTH apps run.
+> All 12 planned phases are implemented, plus: routines with a rotation, supersets, program
+> templates, mid-workout add/replace/skip/remove, plate calculator + warm-up ramp, per-exercise
+> progress chart, PR history, recovery-based "next routine" pick, period recap, Hevy-style workout
+> feed + detail (muscle split, watch HR trace, vs-last deltas), profile/measurements/preferences
+> parity with Hevy, AI review + AI coach + body check, backup, CSV import/export (with routine
+> creation and muscle inference), live cloud sync, and a watch that mirrors the phone OR runs a
+> workout on its own and syncs it back. Unit tests live in `app/src/test/…` (**195 tests**).
+> `docs/hevy-parity-notes.md` records the Hevy walkthrough these features were built against.
 
 ## UI architecture note (important)
 
@@ -86,9 +92,24 @@ rate via Health Services `ExerciseClient`, batched every 8s.
   configurations, or excluding full Guava from `health-services-client`, crashes the watch app on
   launch (`NoClassDefFoundError: com.google.common.base.Preconditions`). The force must stay scoped
   to `*CompileClasspath`. The comments in that file explain the whole trap — read them first.
-- Status: builds, installs, and runs to its Idle screen on a Wear OS 5.1 emulator. **Phone↔watch
-  mirroring and heart rate are still unverified** — that needs a paired device, and emulator
-  pairing needs the Wear OS companion app (Play Store image + Google sign-in).
+- **Status: verified on a real Galaxy Watch7 paired to the OPPO** — phone→watch mirror, watch→phone
+  Done/Skip, heart rate in both directions. Three things that were load-bearing to get there: the
+  wear `applicationId` MUST equal the phone's (`com.getfit`) or the Data Layer silently drops every
+  message; snapshots are received by a manifest-registered `WearableListenerService`
+  (`ForgeListenerService`) so they arrive with the watch app closed; and Android 16 watches need
+  `android.permission.health.READ_HEART_RATE` on top of `BODY_SENSORS` for any HR sample.
+- **Standalone mode.** The watch runs the shared `:engine` itself when the phone doesn't answer a
+  Start within 3 s (`LocalSession`, routine cache + pending uploads in `WatchStore`, SharedPrefs
+  JSON). Finished sessions go up as `WearSessionUpload` and are retried on every reconnect until the
+  phone's `WearUploadService` (also a manifest listener — works with the phone app closed) stores
+  them and acks by id. Verified end to end on the Wear AVD with a seeded cache; the phone→watch leg
+  of that loop is verified on real hardware, the upload leg only by code review.
+- The two emulators (`forge_phone`, `forge_watch`) are NOT paired (that needs the Play companion +
+  Google sign-in), so on AVDs test the watch standalone: seed `shared_prefs/forge_watch.xml` via
+  `run-as com.getfit`.
+- Orientation: the watch activity is `screenOrientation="locked"` (not `nosensor` — the Galaxy
+  Watch runs at ROTATION_270 and `nosensor` would render against the natural orientation). If the
+  whole watch rotates, that is the system `accelerometer_rotation` setting, not the app.
 
 ## Post-MVP features
 
@@ -127,6 +148,21 @@ rate via Health Services `ExerciseClient`, batched every 8s.
   the phone. Restore pulls the **latest** version only; the server keeps the last 20.
 - **Trend insight** (`domain/Trend.kt`) — pure Kotlin, no network; surfaced on Detail and fed to the
   AI review prompt as a pre-computed fact so the model explains it rather than re-deriving it.
+- **Routines** (`data/prefs/Prefs.kt` `RoutinesStore`, `WorkoutRepo`) — the prototype's single plan
+  became a list with a rotation (`RoutinesData.currentId`, advanced by `advanceAfter` when a session
+  for it is saved; a legacy edited `plan` key migrates into Push Day). `Curated.PROGRAMS` are
+  template routine sets. Imports create a routine per workout name; a past workout can be saved as
+  one. The watch gets the list (with items, prefill weights and bests) on every snapshot.
+- **Coach** (`data/ai/Coach.kt`, `ui/ai/CoachScreen.kt`) — three asks over the same brief as the
+  review: last-workout critique (vs-last deltas are pre-computed), what's next (fed the
+  `domain/Recovery.kt` readiness estimate + the rotation's pick) with PR attempts, and a goal
+  review. NEXT/GOALS answers end in a `TARGETS:` block the app parses into "Set as target" chips.
+- **Room is at v2** (`GetFitDatabase.MIGRATION_1_2`, additive: sessions gained routineId/avgBpm/
+  maxBpm/calories, plus `heart_rate_samples` and `measurements`). Never use destructive migration —
+  the user's phone carries real imported history. `AppContainer.seedOnFirstLaunch` also runs two
+  one-shot upgrades gated by DataStore flags (demo-row purge, imported-muscle re-inference).
+- **Placeholders are gone.** No seeded PRs/targets, no "Alex Rivera": Home/Settings show the
+  profile name or a person icon, and empty states everywhere. Don't bring demo data back.
 
 ## Logic that must stay byte-for-byte faithful
 
@@ -141,9 +177,14 @@ prototype's outputs:
   (today optional — if no session today, start from yesterday).
 - **Week aggregation**: week starts **Monday** (`(getDay()+6)%7`). Per-day volume drives the bar chart;
   weekly goal is **5 sessions**.
-- **Session state machine** (`startSession` → `tick` → `doneSet` → `advanceFromRest` → `endSession`):
-  work/rest phases, 1s ticker, PR checked on every logged set, volume accumulates (weighted only),
-  a `history` record is written on end. Weight prefilled from last logged set, else `DEFAULTW`, else 20.
+- **Session state machine** (`startSession` → `tick` → `doneSet` → `advanceFromRest` → `endSession`,
+  now in `engine/`): work/rest phases, 1s ticker, PR checked on every logged set, volume accumulates
+  (weighted only), a `history` record is written on end. Weight prefilled from last logged set, else
+  `DEFAULTW`, else 20. Extensions on top of the prototype, all pure and tested: supersets
+  (`nextPosition` works linked items in rounds with no rest between partners), mid-workout edits
+  (`SessionEdits.kt`: add/replace/remove/skip, totals include orphaned logged sets), a kg↔lb switch
+  mid-session (`convertSessionUnits` — every weight in the state is in display units, so all of them
+  convert together), and a downsampled watch heart-rate trace on the state (`addHeartRate`).
 - **Persistence**: the prototype seeded demo history (`SEED`), `DEFAULTW`, `DEFAULT_PLAN` and 2 demo
   targets on first launch. **The Android app deliberately does not seed demo history or targets any
   more** (dropped once it ran on real devices): first run is the exercise library + the default
@@ -188,13 +229,14 @@ prototype map to these (see the design doc for the table).
 
 ## Commands
 
-Two modules: `:app` (phone, min SDK 26) and `:wear` (Wear OS, min SDK 30). Always build both —
-`:app` compiling proves nothing about `:wear`.
+Three modules: `:app` (phone, min SDK 26), `:wear` (Wear OS, min SDK 30) and `:engine` (pure Kotlin
+JVM, no Android — keep it that way). Always build both apps — `:app` compiling proves nothing about
+`:wear`. `:engine` has no tests of its own; its tests live in `app/src/test` and run with `:app`'s.
 
 ```bash
 ./gradlew :app:assembleDebug :wear:assembleDebug   # build both (do this first)
 ./gradlew :app:installDebug                        # install phone app
-./gradlew :app:testDebugUnitTest                   # JVM unit tests (185)
+./gradlew :app:testDebugUnitTest                   # JVM unit tests (195, incl. the engine's)
 ./gradlew :app:testDebugUnitTest --tests "com.getfit.domain.PrTest"   # single test class
 ./gradlew :app:connectedDebugAndroidTest           # instrumented/Compose UI tests
 ./gradlew :app:lintDebug                           # Android lint
