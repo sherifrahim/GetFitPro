@@ -84,7 +84,7 @@ data class BackupSettings(
 )
 
 @Serializable
-data class BackupPlanItem(val id: String, val sets: Int, val reps: String, val superset: Boolean = false)
+data class BackupPlanItem(val id: String, val sets: Int, val reps: String, val superset: Boolean = false, @SerialName("rest_sec") val restSec: Int = 0)
 
 @Serializable
 data class BackupRoutine(val id: String, val name: String, val items: List<BackupPlanItem>, val note: String = "")

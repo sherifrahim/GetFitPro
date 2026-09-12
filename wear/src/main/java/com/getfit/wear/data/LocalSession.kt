@@ -53,7 +53,7 @@ class LocalSession(private val store: WatchStore, private val scope: CoroutineSc
     fun start(routine: WearRoutine, cache: WatchStore.RoutineCache) {
         if (_state.value != null || routine.items.isEmpty()) return
         units = cache.units
-        val items = routine.items.map { SessionItem(it.id, it.name, it.muscle, it.sets, it.reps, it.bw, it.suggestW, it.equipment, it.superset) }
+        val items = routine.items.map { SessionItem(it.id, it.name, it.muscle, it.sets, it.reps, it.bw, it.suggestW, it.equipment, it.superset, it.restSec) }
         val preBest = routine.items.associate { it.id to (it.bestW to it.bestReps) }
         _state.value = startSession(items, cache.restDefault, preBest, System.currentTimeMillis())
             .copy(name = routine.name, routineId = routine.id)

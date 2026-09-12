@@ -311,6 +311,8 @@ private fun RoutineEditor(vm: AppViewModel, routine: Routine) {
                     onLess = { vm.setSets(item.id, -1) }, onMore = { vm.setSets(item.id, 1) },
                     onReps = { vm.setReps(item.id, it) },
                     onRemove = { vm.removeFromPlan(item.id) },
+                    restDefault = settings.restDefault,
+                    onRest = { vm.setItemRest(item.id, it) },
                 )
                 // Superset link between this row and the next: a tappable chain in the gap.
                 if (i < routine.items.lastIndex) {
@@ -370,6 +372,7 @@ private fun PlanRow(
     isFirst: Boolean, isLast: Boolean, linked: Boolean,
     onUp: () -> Unit, onDown: () -> Unit, onLess: () -> Unit, onMore: () -> Unit,
     onReps: (String) -> Unit, onRemove: () -> Unit,
+    restDefault: Int, onRest: (Int) -> Unit,
 ) {
     // Tapping the "sets × reps" readout swaps it for a small reps field (Hevy's rep-range column).
     var editingReps by remember(item.id) { mutableStateOf(false) }
@@ -385,7 +388,22 @@ private fun PlanRow(
         }
         Column(Modifier.weight(1f)) {
             Text(exName, color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W600, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(sub, color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 2.dp)) {
+                Text(sub, color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                // Per-exercise rest (Hevy's "Rest Timer" line): tap to cycle through presets; 0 = session default.
+                val steps = listOf(0, 30, 45, 60, 90, 120, 180)
+                val custom = item.restSec > 0
+                Box(
+                    Modifier.clip(Pill).background(if (custom) GfColor.AccentFill12 else GfColor.Background)
+                        .clickable(remember { MutableInteractionSource() }, indication = null) {
+                            val i = steps.indexOf(item.restSec).let { if (it < 0) 0 else it }
+                            onRest(steps[(i + 1) % steps.size])
+                        }
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                ) {
+                    Text(if (custom) "rest ${item.restSec}s" else "rest ${restDefault}s", color = if (custom) GfColor.Accent else GfColor.TextFaint, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 10.5.sp)
+                }
+            }
         }
         Row(
             Modifier.clip(RoundedCornerShape(12.dp)).background(GfColor.Background).padding(horizontal = 6.dp, vertical = 5.dp),

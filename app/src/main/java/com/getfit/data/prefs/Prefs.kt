@@ -153,7 +153,7 @@ class SettingsStore(private val ds: DataStore<Preferences>) {
 /** One routine line. [superset] links this exercise with the NEXT one: their sets alternate with no
  *  rest between partners (see SessionEngine.nextPosition). */
 @Serializable
-data class PlanItemData(val id: String, val sets: Int, val reps: String, val superset: Boolean = false)
+data class PlanItemData(val id: String, val sets: Int, val reps: String, val superset: Boolean = false, val restSec: Int = 0)
 
 /**
  * A named, ordered workout: what Hevy calls a routine. The single "Push Day" plan the prototype

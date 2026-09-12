@@ -29,6 +29,8 @@ data class SessionItem(
     val equipment: String = "",
     /** Linked with the NEXT item as a superset: their sets alternate with no rest in between. */
     val superset: Boolean = false,
+    /** Rest after each set of THIS exercise, seconds; 0 = the session's default (Hevy's per-exercise rest timer). */
+    val restSec: Int = 0,
 )
 
 @Serializable
@@ -85,6 +87,10 @@ data class SessionState(
     val name: String = "Workout",
     val routineId: String = "",
     val hr: List<HrPoint> = emptyList(),
+    // The session-wide rest length. [restTotal] is the CURRENT rest's length (per-exercise overrides
+    // change it set by set); this is what an exercise without an override falls back to. 0 on
+    // states persisted before this field existed, in which case restTotal is used as before.
+    val restDefault: Int = 0,
 ) {
     val current: SessionItem get() = items[idx]
 }
@@ -110,6 +116,7 @@ fun startSession(
     return SessionState(
         items = items,
         restTotal = restDefault,
+        restDefault = restDefault,
         totalSets = items.sumOf { it.sets },
         preBest = preBest,
         curW = first.suggestW,
@@ -218,7 +225,11 @@ fun doneSet(s: SessionState, units: String, now: Long = System.currentTimeMillis
         p == null -> logged.copy(phase = Phase.DONE)
         // Superset partner: straight into its set, no rest.
         !p.restFirst -> moveTo(logged, p, now)
-        else -> logged.copy(phase = Phase.REST, restLeft = s.restTotal, restEndAtMs = now + s.restTotal * 1000L)
+        else -> {
+            // Per-exercise rest override, else the session default (restTotal for pre-override states).
+            val rest = if (it.restSec > 0) it.restSec else if (s.restDefault > 0) s.restDefault else s.restTotal
+            logged.copy(phase = Phase.REST, restTotal = rest, restLeft = rest, restEndAtMs = now + rest * 1000L)
+        }
     }
     return DoneResult(next, pr)
 }

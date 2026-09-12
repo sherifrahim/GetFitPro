@@ -99,7 +99,7 @@ class BackupRepo(
             ),
             // `plan` is left empty on write: it only exists so pre-routines files still restore.
             routines = routinesData.routines.map { r ->
-                BackupRoutine(r.id, r.name, r.items.map { BackupPlanItem(it.id, it.sets, it.reps, it.superset) }, r.note)
+                BackupRoutine(r.id, r.name, r.items.map { BackupPlanItem(it.id, it.sets, it.reps, it.superset, it.restSec) }, r.note)
             },
             currentRoutineId = routinesData.currentId,
             exercises = exercises.map {
@@ -270,7 +270,7 @@ class BackupRepo(
  */
 internal fun routinesFrom(backup: BackupFile): RoutinesData {
     if (backup.routines.isNotEmpty()) {
-        val routines = backup.routines.map { r -> Routine(r.id, r.name, r.items.map { PlanItemData(it.id, it.sets, it.reps, it.superset) }, r.note) }
+        val routines = backup.routines.map { r -> Routine(r.id, r.name, r.items.map { PlanItemData(it.id, it.sets, it.reps, it.superset, it.restSec) }, r.note) }
         val current = backup.currentRoutineId.takeIf { id -> routines.any { it.id == id } } ?: routines.first().id
         return RoutinesData(routines, current)
     }

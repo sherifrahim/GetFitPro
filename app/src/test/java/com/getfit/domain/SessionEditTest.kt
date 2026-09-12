@@ -100,3 +100,26 @@ class SessionUnitsTest {
         assertThat(convertSessionUnits(s, "kg", "kg")).isEqualTo(s)
     }
 }
+
+class PerExerciseRestTest {
+    @Test fun exercise_override_wins_then_default_returns() {
+        val items = listOf(
+            SessionItem("a", "A", "Chest", sets = 1, reps = "8", bw = false, suggestW = 50.0, restSec = 120),
+            SessionItem("b", "B", "Back", sets = 2, reps = "8", bw = false, suggestW = 50.0),
+        )
+        var s = startSession(items, restDefault = 60, preBest = emptyMap(), now = 0L)
+        s = doneSet(s, "kg", now = 1000).state                  // A: 120 s override
+        assertThat(s.restTotal).isEqualTo(120); assertThat(s.restLeft).isEqualTo(120)
+        assertThat(s.restEndAtMs).isEqualTo(1000 + 120_000)
+        s = advanceFromRest(s, false, now = 2000)
+        s = doneSet(s, "kg", now = 3000).state                  // B: session default
+        assertThat(s.restTotal).isEqualTo(60); assertThat(s.restEndAtMs).isEqualTo(3000 + 60_000)
+    }
+
+    /** A state persisted before restDefault existed (0) keeps using restTotal as the default. */
+    @Test fun legacy_state_without_default_still_rests() {
+        val items = listOf(SessionItem("a", "A", "Chest", sets = 2, reps = "8", bw = false, suggestW = 50.0))
+        val legacy = startSession(items, 90, emptyMap(), now = 0L).copy(restDefault = 0)
+        assertThat(doneSet(legacy, "kg", now = 1).state.restTotal).isEqualTo(90)
+    }
+}

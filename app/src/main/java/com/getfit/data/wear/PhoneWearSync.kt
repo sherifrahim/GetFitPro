@@ -133,6 +133,7 @@ fun toWearRoutines(
             equipment = e.equipment, superset = p.superset,
             bestW = best?.let { com.getfit.domain.Units.toDisplay(it.weight, units) } ?: 0.0, bestReps = best?.reps ?: 0,
             last = lastSetsByExercise[p.id].orEmpty(),
+            restSec = p.restSec,
         )
     }
     WearRoutine(r.id, r.name, r.items.size, r.setsTotal, items)

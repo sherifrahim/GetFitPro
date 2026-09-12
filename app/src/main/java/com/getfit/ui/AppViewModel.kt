@@ -172,6 +172,7 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     fun movePlan(index: Int, dir: Int) = viewModelScope.launch { workoutRepo.movePlan(index, dir, targetRoutineId()) }
     fun setSets(id: String, delta: Int) = viewModelScope.launch { workoutRepo.setSets(id, delta, targetRoutineId()) }
     fun setReps(id: String, reps: String) = viewModelScope.launch { workoutRepo.setReps(id, reps, targetRoutineId()) }
+    fun setItemRest(id: String, restSec: Int) = viewModelScope.launch { workoutRepo.setRest(id, restSec, targetRoutineId()) }
     fun toggleSuperset(id: String) = viewModelScope.launch {
         val r = data.value.routine(targetRoutineId()) ?: data.value.currentRoutine ?: return@launch
         val item = r.items.firstOrNull { it.id == id } ?: return@launch

@@ -117,7 +117,7 @@ class SessionController(
                 val bw = isBW(e.equipment, e.reps)
                 val lastKg = logsByEx[pi.id]?.maxByOrNull { it.dateMs }?.weight
                 val suggestKg = lastKg ?: Curated.DEFAULT_WEIGHT[pi.id] ?: 20.0
-                SessionItem(pi.id, e.name, e.muscle, pi.sets, pi.reps, bw, Units.roundDisplay(Units.toDisplay(suggestKg, u)), e.equipment, pi.superset)
+                SessionItem(pi.id, e.name, e.muscle, pi.sets, pi.reps, bw, Units.roundDisplay(Units.toDisplay(suggestKg, u)), e.equipment, pi.superset, pi.restSec)
             }
             if (sessItems.isEmpty()) return@launch
 

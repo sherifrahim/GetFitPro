@@ -169,6 +169,12 @@ class WorkoutRepo(
         edit(r.id) { it.copy(items = it.items.map { p -> if (p.id == id) p.copy(superset = on) else p }) }
     }
 
+    /** Per-exercise rest override in seconds; 0 = back to the session default. */
+    suspend fun setRest(id: String, restSec: Int, routineId: String? = null) {
+        val r = resolve(routineId) ?: return
+        edit(r.id) { it.copy(items = it.items.map { p -> if (p.id == id) p.copy(restSec = restSec.coerceIn(0, 600)) else p }) }
+    }
+
     suspend fun resetPlan() {
         routinesStore.resetToDefault()
         syncRepo.noteChange()
