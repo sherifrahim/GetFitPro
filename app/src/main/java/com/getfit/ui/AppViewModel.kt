@@ -219,6 +219,20 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         toast("Added ${p.days.size} routines from ${p.name}", "playlist_add_check")
     }
 
+    /** One routine per distinct workout name in history (most recent session of each), skipping names already present. */
+    fun createRoutinesFromHistory() = viewModelScope.launch {
+        val d = data.value
+        val existing = d.routines.map { it.name.trim().lowercase() }.toMutableSet()
+        var made = 0
+        d.sessions.sortedByDescending { it.dateMs }.forEach { s ->
+            val key = s.name.trim().lowercase()
+            if (key.isBlank() || key == "workout" || key in existing) return@forEach
+            if (workoutRepo.routineFromSession(s.id) != null) { existing += key; made++ }
+        }
+        closePrograms()
+        toast(if (made > 0) "Created $made routine${if (made == 1) "" else "s"} from your history" else "Nothing new to create", if (made > 0) "playlist_add_check" else "info")
+    }
+
     fun saveSessionAsRoutine(sessionId: String) = viewModelScope.launch {
         val r = workoutRepo.routineFromSession(sessionId)
         toast(if (r != null) "Saved as routine \"${r.name}\"" else "Nothing to save", if (r != null) "playlist_add_check" else "info")

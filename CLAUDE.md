@@ -26,7 +26,7 @@ The Android app (Kotlin + Jetpack Compose) is otherwise built to look and behave
 > feed + detail (muscle split, watch HR trace, vs-last deltas), profile/measurements/preferences
 > parity with Hevy, AI review + AI coach + body check, backup, CSV import/export (with routine
 > creation and muscle inference), live cloud sync, and a watch that mirrors the phone OR runs a
-> workout on its own and syncs it back. Unit tests live in `app/src/test/…` (**195 tests**).
+> workout on its own and syncs it back. Unit tests live in `app/src/test/…` (**197 tests**).
 > `docs/hevy-parity-notes.md` records the Hevy walkthrough these features were built against.
 
 ## UI architecture note (important)
@@ -236,7 +236,7 @@ JVM, no Android — keep it that way). Always build both apps — `:app` compili
 ```bash
 ./gradlew :app:assembleDebug :wear:assembleDebug   # build both (do this first)
 ./gradlew :app:installDebug                        # install phone app
-./gradlew :app:testDebugUnitTest                   # JVM unit tests (195, incl. the engine's)
+./gradlew :app:testDebugUnitTest                   # JVM unit tests (197, incl. the engine's)
 ./gradlew :app:testDebugUnitTest --tests "com.getfit.domain.PrTest"   # single test class
 ./gradlew :app:connectedDebugAndroidTest           # instrumented/Compose UI tests
 ./gradlew :app:lintDebug                           # Android lint

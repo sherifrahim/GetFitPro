@@ -162,3 +162,46 @@ class WearSnapshotTest {
         assertThat(json.decodeFromString<HeartRateBatch>(json.encodeToString(batch))).isEqualTo(batch)
     }
 }
+
+class WearRoutinesTest {
+    private val bench = com.getfit.data.db.ExerciseEntity("bench", "Bench", "Chest", "Barbell", "Intermediate", "Chest", "", "8", null, "")
+    private val dip = com.getfit.data.db.ExerciseEntity("dip", "Dip", "Arms", "Bodyweight", "Intermediate", "Triceps", "", "12", null, "")
+
+    @Test fun items_carry_display_prefill_bests_and_last_sets() {
+        val routines = listOf(
+            com.getfit.data.prefs.Routine("r1", "Push", listOf(
+                com.getfit.data.prefs.PlanItemData("bench", 3, "8", superset = true),
+                com.getfit.data.prefs.PlanItemData("dip", 2, "12"),
+                com.getfit.data.prefs.PlanItemData("ghost", 1, "5"),      // not in the library: dropped
+            )),
+        )
+        val best = mapOf("bench" to com.getfit.domain.Best(false, 100.0, 5, 117, 0L))
+        val out = toWearRoutines(routines, mapOf("bench" to bench, "dip" to dip), mapOf("bench" to 80.0), best, "lb", mapOf("bench" to "176.4×8"))
+        val r = out.single()
+        assertThat(r.exercises).isEqualTo(3); assertThat(r.sets).isEqualTo(6)   // counts follow the routine as written
+        assertThat(r.items.map { it.id }).containsExactly("bench", "dip").inOrder()
+        val b = r.items[0]
+        assertThat(b.suggestW).isWithin(0.01).of(176.37)                      // 80 kg in lb
+        assertThat(b.bestW).isWithin(0.01).of(220.46)
+        assertThat(b.bestReps).isEqualTo(5)
+        assertThat(b.superset).isTrue()
+        assertThat(b.equipment).isEqualTo("Barbell")
+        assertThat(b.last).isEqualTo("176.4×8")
+        val d = r.items[1]
+        assertThat(d.bw).isTrue()
+        assertThat(d.suggestW).isEqualTo(0.0)                                   // DEFAULT_WEIGHT["dip"] = 0
+        assertThat(d.bestW).isEqualTo(0.0)
+    }
+
+    /** Snapshot round-trips the routine list, so a watch with an older protocol still decodes it. */
+    @Test fun snapshot_carries_routines_and_rest_default() {
+        val wr = listOf(WearRoutine("r1", "Push", 1, 3, listOf(WearItem("bench", "Bench", "Chest", 3, "8", false, 60.0))))
+        val snap = toWearSnapshot(null, "kg", wr, "r1", restDefault = 90)
+        val json = Json { ignoreUnknownKeys = true }
+        val back = json.decodeFromString<SessionSnapshot>(json.encodeToString(snap))
+        assertThat(back.active).isFalse()
+        assertThat(back.currentRoutineId).isEqualTo("r1")
+        assertThat(back.restDefault).isEqualTo(90)
+        assertThat(back.routines.single().items.single().suggestW).isEqualTo(60.0)
+    }
+}

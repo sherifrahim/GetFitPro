@@ -138,6 +138,23 @@ private fun RoutinesList(vm: AppViewModel) {
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 )
                 Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+                    if (data.sessions.isNotEmpty()) {
+                        val press = remember { MutableInteractionSource() }
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp)).background(GfColor.Background)
+                                .border(1.dp, Color(0x660B7BF7), RoundedCornerShape(16.dp))
+                                .clickable(press, indication = null) { vm.createRoutinesFromHistory() }.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("From my history", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
+                                Text("One routine per workout name you've logged (imports included), built from its latest session.", color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W500, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 3.dp))
+                            }
+                            Box(Modifier.clip(Pill).background(GfColor.Accent).padding(horizontal = 12.dp, vertical = 7.dp)) {
+                                Text("Create", color = GfColor.OnAccent, fontFamily = Manrope, fontWeight = FontWeight.W800, fontSize = 12.sp)
+                            }
+                        }
+                    }
                     Curated.PROGRAMS.forEach { p ->
                         val press = remember { MutableInteractionSource() }
                         Row(
