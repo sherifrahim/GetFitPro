@@ -92,6 +92,7 @@ dependencies {
     // failure at package time.
     compileOnly(libs.guava.listenablefuture)
     implementation(libs.kotlinx.serialization.json)
+    implementation(project(":engine"))
 
     debugImplementation(libs.androidx.ui.tooling)
 }

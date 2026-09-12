@@ -54,6 +54,9 @@ data class NavState(
     /** Progress tab: the session whose detail overlay is open. */
     val sessionDetailId: String? = null,
     val recapOpen: Boolean = false,
+    /** Active session: the "⋯" sheet, and which pick the exercise list is serving ("add" | "replace"). */
+    val sessionMenuOpen: Boolean = false,
+    val sessionPick: String? = null,
     val profileOpen: Boolean = false,
     val measurementsOpen: Boolean = false,
     val booted: Boolean = false,

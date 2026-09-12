@@ -352,6 +352,21 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
     }
     fun endSession() = viewModelScope.launch { sessionController.endAndSave(); selectTab(TAB_PROGRESS) }
 
+    // Mid-workout edits: the sheet on the session screen, and the exercise list doubling as a picker.
+    fun openSessionMenu() = _nav.update { it.copy(sessionMenuOpen = true) }
+    fun closeSessionMenu() = _nav.update { it.copy(sessionMenuOpen = false) }
+    fun startSessionPick(mode: String) = _nav.update { it.copy(sessionMenuOpen = false, sessionPick = mode, query = "", filter = "All") }
+    fun cancelSessionPick() = _nav.update { it.copy(sessionPick = null) }
+    fun pickExercise(id: String) {
+        when (_nav.value.sessionPick) {
+            "add" -> { sessionController.addExercise(id); toast("Added to this workout", "add_circle") }
+            "replace" -> { sessionController.replaceCurrent(id); toast("Exercise replaced", "check_circle") }
+        }
+        _nav.update { it.copy(sessionPick = null) }
+    }
+    fun sessionSkipExercise() { closeSessionMenu(); sessionController.skipExercise() }
+    fun sessionRemoveCurrent() { closeSessionMenu(); sessionController.removeCurrent() }
+
     // ---- history ----
     fun openSessionDetail(id: String) = _nav.update { it.copy(sessionDetailId = id) }
     fun openRecap() = _nav.update { it.copy(recapOpen = true) }

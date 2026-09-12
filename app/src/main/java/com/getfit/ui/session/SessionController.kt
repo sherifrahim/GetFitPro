@@ -8,6 +8,10 @@ import com.getfit.di.AppContainer
 import com.getfit.domain.HrPoint
 import com.getfit.domain.LoggedSet
 import com.getfit.domain.addHeartRate
+import com.getfit.domain.addItem
+import com.getfit.domain.removeItem
+import com.getfit.domain.replaceItem
+import com.getfit.domain.skipExercise
 import com.getfit.domain.avgBpm
 import com.getfit.domain.estimateCalories
 import com.getfit.domain.maxBpm
@@ -190,6 +194,47 @@ class SessionController(
     fun decW() { _state.update { it?.let { s -> adjustW(s, -1, units) } }; persist() }
     fun incR() { _state.update { it?.let { s -> adjustR(s, 1) } }; persist() }
     fun decR() { _state.update { it?.let { s -> adjustR(s, -1) } }; persist() }
+
+    /** Builds a session item for [exerciseId] the same way [start] does: prefill from the last log. */
+    private suspend fun buildItem(exerciseId: String, sets: Int, reps: String?): SessionItem? {
+        val e = container.exerciseRepo.byId(exerciseId) ?: return null
+        val u = container.settingsStore.flow.first().units
+        val bw = isBW(e.equipment, e.reps)
+        val lastKg = container.exerciseRepo.lastWeight(exerciseId)
+        val suggestKg = lastKg ?: Curated.DEFAULT_WEIGHT[exerciseId] ?: 20.0
+        return SessionItem(e.id, e.name, e.muscle, sets, reps ?: e.reps, bw, Units.roundDisplay(Units.toDisplay(suggestKg, u)), e.equipment)
+    }
+
+    // ---- mid-workout edits (see SessionEdits.kt) ----
+
+    /** Hevy's "Add exercise" on the active workout: appended after the planned ones. */
+    fun addExercise(exerciseId: String, sets: Int = 3) {
+        scope.launch {
+            val item = buildItem(exerciseId, sets, null) ?: return@launch
+            _state.update { it?.let { s -> addItem(s, item) } }
+            persist()
+        }
+    }
+
+    /** Swap the current exercise for another; sets already logged for it stay. */
+    fun replaceCurrent(exerciseId: String) {
+        scope.launch {
+            val cur = _state.value?.current ?: return@launch
+            val item = buildItem(exerciseId, cur.sets, null) ?: return@launch
+            _state.update { it?.let { s -> replaceItem(s, s.idx, item, System.currentTimeMillis()) } }
+            persist()
+        }
+    }
+
+    fun skipExercise() {
+        _state.update { it?.let { s -> skipExercise(s, System.currentTimeMillis()) } }
+        persist()
+    }
+
+    fun removeCurrent() {
+        _state.update { it?.let { s -> removeItem(s, s.idx, System.currentTimeMillis()) } }
+        persist()
+    }
 
     /** Persist the session (if anything logged) and clear. */
     suspend fun endAndSave() {

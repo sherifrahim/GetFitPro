@@ -172,6 +172,14 @@ fun RootScaffold(vm: AppViewModel) {
         AnimatedVisibility(visible = session != null, enter = fadeIn(tween(300)), exit = fadeOut(tween(250))) {
             SessionScreen(vm)
         }
+        // Exercise picker for mid-workout add/replace: the Exercises list, above the session.
+        BackHandler(enabled = session != null && nav.sessionPick != null) { vm.cancelSessionPick() }
+        AnimatedVisibility(
+            visible = session != null && nav.sessionPick != null,
+            enter = slideInVertically(tween(300)) { it }, exit = slideOutVertically(tween(250)) { it },
+        ) {
+            Box(Modifier.fillMaxSize().background(GfColor.Background).statusBarsPadding()) { ExercisesScreen(vm) }
+        }
 
         // Toast
         Box(Modifier.fillMaxSize().padding(bottom = 96.dp), contentAlignment = Alignment.BottomCenter) {

@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 rootProject.name = "GetFitPro"
 include(":app")
 include(":wear")
+include(":engine")

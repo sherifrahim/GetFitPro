@@ -83,6 +83,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
+    implementation(project(":engine"))
 
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)

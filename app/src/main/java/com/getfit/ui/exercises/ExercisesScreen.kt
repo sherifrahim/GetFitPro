@@ -56,6 +56,7 @@ fun ExercisesScreen(vm: AppViewModel) {
     val nav by vm.nav.collectAsState()
     val settings by vm.settings.collectAsState()
 
+    val picking = nav.sessionPick
     val q = nav.query.trim().lowercase()
     val filtered = remember(data.exercises, nav.query, nav.filter) {
         data.exercises.filter { e ->
@@ -73,7 +74,15 @@ fun ExercisesScreen(vm: AppViewModel) {
         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 8.dp, bottom = 108.dp),
     ) {
         item {
-            Text("Exercises", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 26.sp, modifier = Modifier.padding(vertical = 6.dp))
+            if (picking != null) {
+                // Picker mode for the active workout: same list, one tap picks, Cancel goes back.
+                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (picking == "replace") "Replace with…" else "Add to workout", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 26.sp, modifier = Modifier.weight(1f))
+                    Text("Cancel", color = GfColor.Accent, fontFamily = Manrope, fontWeight = FontWeight.W700, fontSize = 14.sp, modifier = Modifier.clickable(remember { MutableInteractionSource() }, indication = null) { vm.cancelSessionPick() })
+                }
+            } else {
+                Text("Exercises", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 26.sp, modifier = Modifier.padding(vertical = 6.dp))
+            }
             Text(libLine, color = GfColor.TextDim, fontFamily = Manrope, fontWeight = FontWeight.W600, fontSize = 13.sp, modifier = Modifier.padding(bottom = 16.dp))
             SearchField(nav.query, hasQuery = nav.query.isNotEmpty(), onChange = vm::setQuery, onClear = vm::clearQuery)
             Row(
@@ -89,7 +98,8 @@ fun ExercisesScreen(vm: AppViewModel) {
         }
         items(filtered, key = { it.id }) { ex ->
             ExerciseRow(ex, best = data.bestMap[ex.id], units = settings.units,
-                onOpen = { vm.openDetail(ex.id) }, onAdd = { vm.addToPlan(ex.id) })
+                onOpen = { if (picking != null) vm.pickExercise(ex.id) else vm.openDetail(ex.id) },
+                onAdd = { if (picking != null) vm.pickExercise(ex.id) else vm.addToPlan(ex.id) })
             Spacer(Modifier.height(10.dp))
         }
         if (filtered.isEmpty()) {

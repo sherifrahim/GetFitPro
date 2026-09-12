@@ -46,6 +46,9 @@ import com.getfit.core.ui.msIcon
 import com.getfit.core.ui.pressScale
 import com.getfit.domain.Phase
 import com.getfit.domain.Plates
+import com.getfit.domain.canRemoveItem
+import com.getfit.core.ui.GfSheet
+import com.getfit.core.ui.GfSheetRow
 import com.getfit.domain.Units
 import com.getfit.domain.platesFor
 import com.getfit.domain.warmupRamp
@@ -65,9 +68,20 @@ fun SessionScreen(vm: AppViewModel) {
     val settings by vm.settings.collectAsState()
     val state = s ?: return
 
+    val nav by vm.nav.collectAsState()
     Box(Modifier.fillMaxSize().background(if (state.phase == Phase.DONE) GfColor.Accent else GfColor.Background)) {
         if (state.phase == Phase.DONE) DoneView(state, settings.units, vm::endSession)
         else ActiveView(state, settings.units, vm)
+
+        // Hevy's per-exercise menu on the active workout.
+        if (nav.sessionMenuOpen && state.phase != Phase.DONE) {
+            GfSheet(title = state.current.name, onDismiss = vm::closeSessionMenu) {
+                GfSheetRow(msIcon("add_circle"), "Add an exercise to this workout") { vm.startSessionPick("add") }
+                GfSheetRow(msIcon("content_copy"), "Replace this exercise") { vm.startSessionPick("replace") }
+                GfSheetRow(msIcon("skip_next"), "Skip the rest of this exercise") { vm.sessionSkipExercise() }
+                if (canRemoveItem(state, state.idx)) GfSheetRow(msIcon("delete"), "Remove this exercise", destructive = true) { vm.sessionRemoveCurrent() }
+            }
+        }
     }
 }
 
@@ -89,7 +103,10 @@ private fun ActiveView(s: SessionState, units: String, vm: AppViewModel) {
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Icon(msIcon("close"), null, tint = GfColor.Text, modifier = Modifier.size(28.dp).clickable(remember { MutableInteractionSource() }, indication = null) { vm.endSession() })
             Text("Exercise ${s.idx + 1} of ${s.items.size}", color = GfColor.Text, fontFamily = SpaceGrotesk, fontWeight = FontWeight.W700, fontSize = 15.sp)
-            Icon(msIcon(if (s.paused) "play_arrow" else "pause"), null, tint = GfColor.Text, modifier = Modifier.size(28.dp).clickable(remember { MutableInteractionSource() }, indication = null) { ctrl.togglePause() })
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(msIcon("more_horiz"), null, tint = GfColor.Text, modifier = Modifier.size(28.dp).clickable(remember { MutableInteractionSource() }, indication = null) { vm.openSessionMenu() })
+                Icon(msIcon(if (s.paused) "play_arrow" else "pause"), null, tint = GfColor.Text, modifier = Modifier.size(28.dp).clickable(remember { MutableInteractionSource() }, indication = null) { ctrl.togglePause() })
+            }
         }
         // segment bar
         Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
