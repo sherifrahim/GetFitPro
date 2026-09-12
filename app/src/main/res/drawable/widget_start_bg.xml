@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Start pill: Accent #0B7BF7 (Tokens.kt) with white on it. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#FF0B7BF7" />
+    <corners android:radius="14dp" />
+</shape>

@@ -35,6 +35,7 @@ class WearUploadService : WearableListenerService() {
         // functions, so block this thread — it is ours, and the work is one transaction.
         runBlocking { save(container, upload) }
         container.phoneWearSync.sendUploadAck(upload.id)
+        com.getfit.widget.NextWorkoutWidget.refresh(this)
     }
 
     private suspend fun save(container: com.getfit.di.AppContainer, u: WearSessionUpload) {

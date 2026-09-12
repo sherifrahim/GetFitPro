@@ -38,6 +38,7 @@ import com.getfit.data.wear.WearRoutine
 import com.getfit.data.wear.toWearRoutines
 import com.getfit.data.wear.toWearSnapshot
 import com.getfit.di.AppContainer
+import com.getfit.widget.NextWorkoutWidget
 import com.getfit.domain.Best
 import com.getfit.domain.SessionSetRow
 import com.getfit.domain.exerciseDeltas
@@ -59,6 +60,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -142,6 +146,13 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             delay(1050); _nav.update { it.copy(booted = true) }
             delay(350); _nav.update { it.copy(charted = true) }
+        }
+        // Keep the home-screen widget current: it only re-reads the store when something it shows
+        // changed (the routine up next, a saved session, the goal or week start).
+        viewModelScope.launch {
+            combine(data, settings) { d, st -> listOf(d.currentRoutine?.id, d.currentRoutine?.items?.size, d.sessions.size, d.sessions.firstOrNull()?.id, st.weeklyGoal, st.weekStartsMonday, st.restDefault) }
+                .distinctUntilChanged()
+                .collect { if (data.value.loaded) NextWorkoutWidget.refresh(container.appContext) }
         }
     }
 
@@ -364,6 +375,13 @@ class AppViewModel(private val container: AppContainer) : ViewModel() {
         sessionController.start(r)
     }
     fun startCurrentRoutine() { data.value.currentRoutine?.let { startRoutine(it.id) } }
+    /** From the widget: data may not be loaded yet when the activity is cold-started, so wait for it. */
+    fun startRoutineWhenLoaded(id: String) = viewModelScope.launch {
+        if (sessionController.state.value != null) return@launch          // already in a workout
+        val d = data.first { it.loaded }
+        val target = d.routine(id) ?: d.currentRoutine ?: return@launch
+        startRoutine(target.id)
+    }
     fun startSingle(id: String, reps: String) {
         val name = data.value.exercise(id)?.name ?: "Workout"
         sessionController.start(listOf(PlanItemData(id, 3, reps)), name = name)
