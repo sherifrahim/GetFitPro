@@ -20,6 +20,10 @@ data class ParsedSetRow(
     val exerciseName: String,
     val weightKg: Double,
     val reps: Int,
+    /** Session length in seconds when the export carries an end time (Hevy, Strong's "Duration"); 0 = unknown. */
+    val durationSec: Int = 0,
+    /** Hevy's superset_id: rows sharing a non-blank value were a superset. */
+    val supersetId: String = "",
 )
 
 data class ParsedImport(val format: SourceFormat, val rows: List<ParsedSetRow>, val skippedRows: Int)
@@ -115,6 +119,9 @@ fun parseImportCsv(text: String): ParsedImport {
     val weightCol = findCol(header, "weight_kg", "weight")
     val unitCol = findCol(header, "weight_unit", "weight unit")
     val repsCol = findCol(header, "reps", "rep")
+    val endCol = findCol(header, "end_time", "end time")
+    val durationCol = findCol(header, "duration")
+    val supersetCol = findCol(header, "superset_id")
 
     if (exCol < 0 || repsCol < 0) return ParsedImport(format, emptyList(), 0)
 
@@ -156,8 +163,34 @@ fun parseImportCsv(text: String): ParsedImport {
             else -> "single"
         }
 
-        rows.add(ParsedSetRow(sessionKey, sessionName, dateMs, exName, weightKg, reps))
+        // Duration: Hevy gives start/end timestamps; Strong gives a "Duration" like "1h 5m" or "45m".
+        val durationSec = when {
+            endCol >= 0 -> {
+                val end = r.getOrNull(endCol)?.trim().orEmpty()
+                if (end.isBlank() || dateRaw.isBlank()) 0 else ((parseFlexibleDate(end, 0L) - dateMs) / 1000).toInt().coerceIn(0, 12 * 3600)
+            }
+            durationCol >= 0 -> parseDurationSec(r.getOrNull(durationCol)?.trim().orEmpty())
+            else -> 0
+        }
+        val supersetId = supersetCol.takeIf { it >= 0 }?.let { r.getOrNull(it)?.trim() }.orEmpty()
+
+        rows.add(ParsedSetRow(sessionKey, sessionName, dateMs, exName, weightKg, reps, durationSec, supersetId))
     }
 
     return ParsedImport(format, rows, skipped)
+}
+
+/** "1h 5m", "45m", "1:05:00", "3900" (seconds) → seconds; anything else 0. */
+internal fun parseDurationSec(raw: String): Int {
+    if (raw.isBlank()) return 0
+    raw.toLongOrNull()?.let { return it.toInt().coerceIn(0, 12 * 3600) }
+    Regex("""^(\d{1,2}):(\d{2})(?::(\d{2}))?$""").find(raw)?.let { m ->
+        val (a, b, c) = m.destructured
+        return if (c.isNotEmpty()) a.toInt() * 3600 + b.toInt() * 60 + c.toInt() else a.toInt() * 60 + b.toInt()
+    }
+    var total = 0
+    Regex("""(\d+)\s*h""").find(raw)?.let { total += it.groupValues[1].toInt() * 3600 }
+    Regex("""(\d+)\s*m""").find(raw)?.let { total += it.groupValues[1].toInt() * 60 }
+    Regex("""(\d+)\s*s\b""").find(raw)?.let { total += it.groupValues[1].toInt() }
+    return total.coerceIn(0, 12 * 3600)
 }

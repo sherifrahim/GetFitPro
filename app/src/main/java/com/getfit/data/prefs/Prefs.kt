@@ -81,6 +81,7 @@ private object Keys {
     val PR_NOTIFY = booleanPreferencesKey("prNotify")
     val WEEK_MONDAY = booleanPreferencesKey("weekStartsMonday")
     val DEMO_PURGED = booleanPreferencesKey("demoPurged")
+    val IMPORT_MUSCLES_FIXED = booleanPreferencesKey("importMusclesFixed")
     val PLAN = stringPreferencesKey("plan") // legacy single plan: read once by RoutinesStore, then removed
     val ROUTINES = stringPreferencesKey("routines")
     val SESSION = stringPreferencesKey("session")
@@ -124,6 +125,8 @@ class SettingsStore(private val ds: DataStore<Preferences>) {
     /** One-shot flag for Seeder.purgeDemoData: true once an install has been cleaned of demo rows. */
     suspend fun isDemoPurged(): Boolean = ds.data.first()[Keys.DEMO_PURGED] ?: false
     suspend fun setDemoPurged() = ds.edit { it[Keys.DEMO_PURGED] = true }
+    suspend fun isImportMusclesFixed(): Boolean = ds.data.first()[Keys.IMPORT_MUSCLES_FIXED] ?: false
+    suspend fun setImportMusclesFixed() = ds.edit { it[Keys.IMPORT_MUSCLES_FIXED] = true }
     suspend fun setAiModel(v: String) = ds.edit { it[Keys.AI_MODEL] = v }
     suspend fun setAiProvider(v: String) = ds.edit { it[Keys.AI_PROVIDER] = v }
     suspend fun setCompatBaseUrl(v: String) = ds.edit { it[Keys.COMPAT_BASE_URL] = v.trim().trimEnd('/') }

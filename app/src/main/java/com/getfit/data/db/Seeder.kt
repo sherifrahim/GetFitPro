@@ -50,6 +50,19 @@ object Seeder {
     }
 
     /**
+     * One-shot for installs whose CSV imports predate [inferMuscle]: every invented `imp_*` exercise
+     * was filed under "Core". Re-derive from the name; returns how many rows changed.
+     */
+    suspend fun reinferImportedMuscles(db: GetFitDatabase): Int {
+        var changed = 0
+        db.exerciseDao().imported().forEach { e ->
+            val m = inferMuscle(e.name)
+            if (m != e.muscle) { db.exerciseDao().setMuscle(e.id, m); changed++ }
+        }
+        return changed
+    }
+
+    /**
      * Wipe all user data (proto clearAll, L816-822): logs, history and targets become empty —
      * real zeros + empty states, NOT re-seeded demo data. The exercise library is kept.
      * Plan/settings reset is handled by the DataStore layer.

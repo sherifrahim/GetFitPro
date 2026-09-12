@@ -94,3 +94,28 @@ fun CuratedExercise.toEntity(): ExerciseEntity = ExerciseEntity(
     target = muscle, secondaryMuscles = "", reps = reps, mediaId = mediaId,
     cues = cues.joinToString("||"), curated = true,
 )
+
+/**
+ * Muscle group for an exercise the library doesn't know, from its name alone — used by the CSV
+ * importer for the `imp_*` rows it invents. Before this every unmatched import landed in "Core",
+ * which skewed the muscle-balance analysis and the recovery heuristic. Order matters: the more
+ * specific cues (hip thrust → Glutes, face pull → Shoulders) are checked before the generic ones
+ * (thrust, pull). Unknown names fall back to "Core" as before.
+ */
+fun inferMuscle(name: String): String {
+    val n = name.lowercase()
+    fun has(vararg k: String) = k.any { n.contains(it) }
+    return when {
+        has("hip thrust", "glute", "hip abduct", "hip adduct") -> "Glutes"
+        has("romanian", "rdl", "stiff-leg", "stiff leg", "leg curl", "hamstring", "nordic") -> "Legs"
+        has("treadmill", "running", " run", "cycling", "bike", "elliptical", "rower", "rowing machine", "jump rope", "skipping", "stair", "burpee", "sprint", "walking", "jog") -> "Cardio"
+        has("face pull", "lateral raise", "front raise", "rear delt", "shoulder press", "overhead press", "military press", "arnold", "shrug", "upright row", "delt") -> "Shoulders"
+        has("curl", "tricep", "bicep", "skull", "pushdown", "push down", "kickback", "preacher", "hammer", "overhead extension", "dip") -> "Arms"
+        has("crunch", "plank", "sit-up", "situp", "sit up", "leg raise", "knee raise", "ab ", "abs", "abdominal", "russian twist", "dead bug", "hollow", "wood chop", "pallof", "hanging") -> "Core"
+        has("bench", "chest", "pec", "push-up", "push up", "pushup", "fly", "flye", "incline press", "decline press") -> "Chest"
+        has("row", "pulldown", "pull down", "pull-up", "pull up", "pullup", "chin-up", "chin up", "chinup", "lat ", "lats", "deadlift", "back extension", "hyperextension", "good morning", "rack pull", "pullover") ->
+            if (has("upright row")) "Shoulders" else "Back"
+        has("squat", "leg", "lunge", "calf", "hamstring", "quad", "hack", "step-up", "step up", "split", "sled", "thrust", "adductor", "abductor", "rdl", "romanian") -> "Legs"
+        else -> "Core"
+    }
+}

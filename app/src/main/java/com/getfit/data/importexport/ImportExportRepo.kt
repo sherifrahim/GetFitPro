@@ -8,6 +8,7 @@ import com.getfit.data.db.SessionEntity
 import com.getfit.data.db.SessionSetEntity
 import com.getfit.data.db.SetLogEntity
 import com.getfit.data.db.defaultReps
+import com.getfit.data.db.inferMuscle
 import com.getfit.data.db.titleCase
 import com.getfit.data.repo.WorkoutRepo
 import kotlinx.coroutines.flow.first
@@ -65,10 +66,11 @@ class ImportExportRepo(
             val clean = titleCase(rawName.trim())
             val equip = if (everWeighted[key] == true) "Barbell" else "Bodyweight"
             val slug = key.replace(Regex("[^a-z0-9]+"), "_").trim('_').ifEmpty { "exercise" }
+            val muscle = inferMuscle(clean)
             val entity = ExerciseEntity(
-                id = "imp_$slug", name = clean, muscle = "Core", equipment = equip,
-                level = "Intermediate", target = "Core", secondaryMuscles = "",
-                reps = defaultReps("Core", equip), mediaId = null, cues = "", curated = false,
+                id = "imp_$slug", name = clean, muscle = muscle, equipment = equip,
+                level = "Intermediate", target = muscle, secondaryMuscles = "",
+                reps = defaultReps(muscle, equip), mediaId = null, cues = "", curated = false,
             )
             byNormName[key] = entity
             newExercises.add(entity)
@@ -94,7 +96,7 @@ class ImportExportRepo(
                 volume += (row.weightKg * row.reps).toInt()
                 setsImported++
             }
-            sessions.add(SessionEntity(id, dateMs, name, 0, setRows.size, volume, 0))
+            sessions.add(SessionEntity(id, dateMs, name, setRows.first().durationSec, setRows.size, volume, 0))
         }
 
         if (newExercises.isNotEmpty()) exerciseDao.insertAll(newExercises)

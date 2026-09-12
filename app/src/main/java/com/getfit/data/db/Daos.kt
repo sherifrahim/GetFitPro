@@ -22,6 +22,13 @@ interface ExerciseDao {
 
     @Query("SELECT * FROM exercises WHERE id IN (:ids)")
     suspend fun byIds(ids: List<String>): List<ExerciseEntity>
+
+    /** Imported (`imp_*`) rows only, for the one-shot muscle re-inference in Seeder. */
+    @Query("SELECT * FROM exercises WHERE id LIKE 'imp_%'")
+    suspend fun imported(): List<ExerciseEntity>
+
+    @Query("UPDATE exercises SET muscle = :muscle, target = :muscle WHERE id = :id")
+    suspend fun setMuscle(id: String, muscle: String)
 }
 
 @Dao

@@ -63,6 +63,10 @@ class AppContainer(val appContext: Context) {
                 if (Seeder.purgeDemoData(db) > 0) syncRepo.noteChange()
                 settingsStore.setDemoPurged()
             }
+            if (!settingsStore.isImportMusclesFixed()) {
+                if (Seeder.reinferImportedMuscles(db) > 0) syncRepo.noteChange()
+                settingsStore.setImportMusclesFixed()
+            }
         }
     }
 
